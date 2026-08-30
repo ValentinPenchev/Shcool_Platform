@@ -1,0 +1,157 @@
+<!DOCTYPE html>
+<html lang="bg">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Учителско Табло - Оценяване</title>
+    <link rel="stylesheet" href="style.css">
+    <!-- Chart.js за графиките -->
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+</head>
+<body>
+
+    <nav class="navbar">
+        <h2>Учителски Панел</h2>
+        <div class="nav-buttons">
+            <button class="nav-btn active" onclick="showSection('dashboard')">📊 Табло & Графики</button>
+            <button class="nav-btn" onclick="showSection('assignments')">🔗 Нова Задача & Линкове</button>
+            <button class="nav-btn" onclick="showSection('classes')">⚙️ Управление на Класове</button>
+        </div>
+    </nav>
+
+    <div class="container">
+
+        <!-- СЕКЦИЯ 1: ТАБЛО И ГРАФИКИ -->
+        <section id="sec-dashboard" class="panel-section">
+            <h3>Статистика за предадените задачи</h3>
+            
+            <div class="filter-bar">
+                <label for="filter-group">Филтър по Клас:</label>
+                <select id="filter-group" onchange="loadDashboardData()"></select>
+            </div>
+
+            <div class="stats-cards">
+                <div class="card">
+                    <span class="card-label">Ученици с предадени задачи</span>
+                    <strong id="stat-count">0</strong>
+                </div>
+                <div class="card">
+                    <span class="card-label">Среден успех</span>
+                    <strong id="stat-avg">0%</strong>
+                </div>
+                <div class="card warning">
+                    <span class="card-label">Засечено плагиатство</span>
+                    <strong id="stat-plagiarism">0</strong>
+                </div>
+            </div>
+
+            <div class="chart-wrapper">
+                <div class="chart-container">
+                    <canvas id="scoresChart"></canvas>
+                </div>
+            </div>
+
+            <h4>Резултати по ученици</h4>
+            <div class="table-responsive">
+                <table id="submissions-table">
+                    <thead>
+                        <tr>
+                            <th>Ученик</th>
+                            <th>Файл</th>
+                            <th>Точки / Успех</th>
+                            <th>Плагиатство</th>
+                            <th>Сваляне</th>
+                        </tr>
+                    </thead>
+                    <tbody></tbody>
+                </table>
+            </div>
+        </section>
+
+        <!-- СЕКЦИЯ 2: НОВА ЗАДАЧА & ГЕНЕРИРАНЕ НА ЛИНК -->
+        <section id="sec-assignments" class="panel-section" style="display:none;">
+            <h3>Генериране на нова задача за клас</h3>
+            <form id="create-assignment-form" class="styled-form">
+                <div class="form-group">
+                    <label for="assign-group-select">Изберете Клас:</label>
+                    <select id="assign-group-select" required></select>
+                </div>
+
+                <div class="form-group">
+                    <label for="assign-title">Заглавие на задачата:</label>
+                    <input type="text" id="assign-title" placeholder="напр. Упражнение 1 - Форматиране" required>
+                </div>
+
+                <h4>Критерии за оценяване:</h4>
+                <div class="checkbox-group">
+                    <label class="checkbox-container">
+                        <input type="checkbox" id="crit-font">
+                        <span class="checkmark"></span>
+                        Задължителен шрифт (Times New Roman, 12pt)
+                    </label>
+                    <label class="checkbox-container">
+                        <input type="checkbox" id="crit-table">
+                        <span class="checkmark"></span>
+                        Изисква се таблица
+                    </label>
+                    <label class="checkbox-container">
+                        <input type="checkbox" id="crit-image">
+                        <span class="checkmark"></span>
+                        Изисква се изображение
+                    </label>
+                </div>
+
+                <button type="submit" class="btn-primary">Създай Задача & Генерирай Линк</button>
+            </form>
+
+            <div id="generated-link-box" style="display:none;" class="link-card">
+                <p><strong>Уникален линк за учениците:</strong></p>
+                <div class="link-input-group">
+                    <input type="text" id="generated-link-url" readonly>
+                    <button class="btn-secondary" onclick="copyLink()">Копирай</button>
+                </div>
+            </div>
+        </section>
+
+        <!-- СЕКЦИЯ 3: УПРАВЛЕНИЕ НА КЛАСОВЕ -->
+        <section id="sec-classes" class="panel-section" style="display:none;">
+            <h3>Добавяне на Нов Клас / Среда</h3>
+            
+            <form id="create-class-form" class="styled-form">
+                <div class="form-grid">
+                    <div class="form-group">
+                        <label for="class-id">Идентификатор:</label>
+                        <input type="text" id="class-id" placeholder="напр. 8a-grp1" required>
+                    </div>
+                    <div class="form-group">
+                        <label for="class-name">Име на групата:</label>
+                        <input type="text" id="class-name" placeholder="напр. 8А - Първа група" required>
+                    </div>
+                </div>
+
+                <div class="form-group">
+                    <label for="class-names-text">Въвеждане на ученици (всяко име на нов ред):</label>
+                    <textarea id="class-names-text" placeholder="Иван Иванов&#10;Георги Петров..." rows="5"></textarea>
+                </div>
+                
+                <div class="file-upload-divider">
+                    <span>ИЛИ</span>
+                </div>
+
+                <div class="form-group">
+                    <label for="class-excel-file">Качете Excel / CSV файл със списък:</label>
+                    <input type="file" id="class-excel-file" accept=".xlsx, .csv" class="file-input-custom">
+                </div>
+
+                <button type="submit" class="btn-primary">Запази Класа</button>
+            </form>
+
+            <h4>Налични Класове:</h4>
+            <ul id="classes-list" class="classes-list"></ul>
+        </section>
+
+    </div>
+
+    <script src="admin.js"></script>
+</body>
+</html>

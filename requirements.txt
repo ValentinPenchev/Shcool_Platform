@@ -1,0 +1,8 @@
+fastapi
+uvicorn
+supabase
+pandas
+openpyxl
+python-docx
+python-pptx
+python-multipart

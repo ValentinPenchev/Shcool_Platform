@@ -1,0 +1,53 @@
+<!DOCTYPE html>
+<html lang="bg">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Предаване на Задача</title>
+    <link rel="stylesheet" href="style.css">
+</head>
+<body>
+    <div class="upload-card">
+        <h2 id="task-title">Зареждане на задача...</h2>
+        <p class="subtitle" id="group-name-display" style="color: var(--text-muted); margin-bottom: 20px;"></p>
+
+        <form id="submission-form" class="styled-form">
+            <div class="form-group">
+                <label for="student-select">Изберете вашето име:</label>
+                <select id="student-select" required>
+                    <option value="">-- Изберете име от списъка --</option>
+                </select>
+            </div>
+
+            <div class="form-group">
+                <label for="file-input">Изберете файл (.docx, .xlsx, .pptx):</label>
+                <input type="file" id="file-input" accept=".docx, .xlsx, .pptx" required>
+            </div>
+
+            <button type="submit" id="submit-btn" class="btn-primary" style="width: 100%;">Качи и Оцени</button>
+        </form>
+
+        <div id="loader" class="hidden" style="margin-top: 20px; text-align: center;">
+            <p>⏳ Файлът се качва в облака и се оценява...</p>
+        </div>
+
+        <!-- Секция за показване на резултата -->
+        <div id="result-box" class="hidden" style="margin-top: 25px;">
+            <h3>Резултат от проверката</h3>
+            <div class="score-badge">
+                <span id="score-percentage">0%</span>
+                <p id="score-points">(0 / 0 т.)</p>
+            </div>
+
+            <div id="plagiarism-warning" class="warning-box hidden">
+                <strong>⚠️ Внимание:</strong> <span id="plagiarism-note"></span>
+            </div>
+
+            <h4 style="margin-top: 15px;">Детайли по критериите:</h4>
+            <ul id="details-list" style="list-style: none; padding-left: 0;"></ul>
+        </div>
+    </div>
+
+    <script src="app.js"></script>
+</body>
+</html>

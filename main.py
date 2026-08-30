@@ -7,7 +7,7 @@ from fastapi import FastAPI, UploadFile, File, Form, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 import pandas as pd
 
-# Модул за връзка със Supabase и автоматично почистване
+# Модул за връзка със Supabase и почистване
 from supabase_client import supabase, upload_to_supabase, cleanup_expired_files
 
 # Модули за проверка на файловете
@@ -18,6 +18,7 @@ from evaluators.metadata import extract_office_metadata
 
 app = FastAPI(title="Office & Code Evaluator API")
 
+# Настройка на CORS - позволява заявки от Live Server и всякакви източници
 app.add_middleware(
     CORSMiddleware,
     allow_origins=["*"],
@@ -33,6 +34,15 @@ async def startup_event():
         cleanup_expired_files(60)
     except Exception as e:
         print(f"Забележка при стартиране (почистване): {e}")
+
+# -----------------------------------------------------------------------------
+# 0. ПРОВЕРКА НА СЪСТОЯНИЕТО (HEALTH CHECK)
+# -----------------------------------------------------------------------------
+
+@app.get("/api/health")
+async def health_check():
+    """Тестов контролен маршрут за проверка дали сървърът работи."""
+    return {"status": "ok", "message": "Backend is running"}
 
 # -----------------------------------------------------------------------------
 # 1. КЛАСОВЕ И СРЕДИ (GROUPS)
@@ -64,7 +74,6 @@ async def create_or_update_group(
             if isinstance(parsed, list):
                 students = [str(item).strip() for item in parsed if str(item).strip()]
         except Exception:
-            # Ако е изпратен обикновен текст с нови редове вместо JSON
             students = [line.strip() for line in students_json.split("\n") if line.strip()]
 
     if not students and file:

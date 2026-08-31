@@ -362,6 +362,26 @@ body {
     margin-bottom: 20px;
 }
 
+.select-icon-wrap {
+    position: relative;
+    margin-top: 6px;
+}
+
+.select-icon-wrap i {
+    position: absolute;
+    left: 12px;
+    top: 50%;
+    transform: translateY(-50%);
+    color: var(--primary-blue);
+    font-size: 13px;
+    pointer-events: none;
+}
+
+.select-icon-wrap .custom-select {
+    padding-left: 34px;
+    margin-top: 0;
+}
+
 .styled-form {
     display: flex;
     flex-direction: column;
@@ -411,7 +431,98 @@ body {
     padding: 20px;
     display: flex;
     align-items: center;
+    justify-content: space-between;
     gap: 16px;
+}
+
+.stat-left {
+    display: flex;
+    align-items: center;
+    gap: 16px;
+    min-width: 0;
+}
+
+/* Декоративна група аватари за картата "Ученици с предадени задачи" */
+.avatar-cluster {
+    position: relative;
+    display: flex;
+    align-items: center;
+    flex-shrink: 0;
+}
+
+.avatar-circle {
+    width: 34px;
+    height: 34px;
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    color: #fff;
+    font-size: 13px;
+    border: 2px solid #fff;
+    margin-left: -10px;
+}
+
+.avatar-circle:first-child { margin-left: 0; }
+.avatar-circle.a0 { background: #93c5fd; }
+.avatar-circle.a1 { background: #a5b4fc; }
+.avatar-circle.a2 { background: #c4b5fd; }
+
+.avatar-check {
+    position: absolute;
+    right: -4px;
+    bottom: -4px;
+    width: 18px;
+    height: 18px;
+    border-radius: 50%;
+    background: var(--primary-blue);
+    color: #fff;
+    font-size: 10px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    border: 2px solid #fff;
+}
+
+/* Кръгъл прогрес пръстен за средния успех */
+.progress-ring {
+    position: relative;
+    width: 56px;
+    height: 56px;
+    flex-shrink: 0;
+}
+
+.progress-ring svg {
+    width: 100%;
+    height: 100%;
+    transform: rotate(-90deg);
+}
+
+.progress-ring .ring-track {
+    fill: none;
+    stroke: var(--badge-green-bg);
+    stroke-width: 6;
+}
+
+.progress-ring .ring-fill {
+    fill: none;
+    stroke: #16a34a;
+    stroke-width: 6;
+    stroke-linecap: round;
+    stroke-dasharray: 169.6;
+    stroke-dashoffset: 169.6;
+    transition: stroke-dashoffset 0.4s ease;
+}
+
+.progress-ring-label {
+    position: absolute;
+    inset: 0;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 12px;
+    font-weight: 700;
+    color: #16a34a;
 }
 
 .stat-icon {
@@ -502,6 +613,124 @@ body {
     font-weight: 600;
     margin-top: 10px;
     margin-left: 10px;
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+}
+
+/* Хоризонтален вариант на drop-zone (икона + текст вляво, бутон вдясно) */
+.drop-zone-row {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 16px;
+    text-align: left;
+    padding: 18px 20px;
+}
+
+.drop-zone-row-left {
+    display: flex;
+    align-items: center;
+    gap: 14px;
+}
+
+.drop-zone-row .drop-cloud-icon {
+    margin-bottom: 0;
+}
+
+.drop-zone-row .drop-subtext {
+    margin: 2px 0 0 0;
+}
+
+/* Статус значка в таблото */
+.badge-status {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    padding: 4px 10px;
+    border-radius: 999px;
+    background: var(--badge-green-bg);
+    color: var(--badge-green-text);
+    font-size: 12px;
+    font-weight: 600;
+}
+
+/* Аватар с инициал за ред в таблица (ученици, резултати) */
+.row-avatar {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 28px;
+    height: 28px;
+    border-radius: 50%;
+    color: #fff;
+    font-size: 12px;
+    font-weight: 700;
+    margin-right: 8px;
+    flex-shrink: 0;
+}
+
+.row-avatar.a0 { background: #6366f1; }
+.row-avatar.a1 { background: #16a34a; }
+.row-avatar.a2 { background: #f59e0b; }
+.row-avatar.a3 { background: #ec4899; }
+.row-avatar.a4 { background: #0ea5e9; }
+
+.file-name-cell {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+}
+
+.file-name-cell i {
+    color: var(--text-muted);
+}
+
+/* Пагинация */
+.pagination-row {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 16px;
+    margin-top: 16px;
+    padding-top: 16px;
+    border-top: 1px solid var(--border-color);
+    font-size: 13px;
+    color: var(--text-muted);
+}
+
+.pagination-row .page-size-select {
+    width: auto;
+    display: inline-block;
+    padding: 6px 10px;
+    margin: 0 6px;
+}
+
+.pagination-controls {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+}
+
+.pagination-controls button {
+    width: 30px;
+    height: 30px;
+    border-radius: 6px;
+    border: 1px solid var(--border-color);
+    background: #fff;
+    color: var(--text-dark);
+    cursor: pointer;
+}
+
+.pagination-controls button.active {
+    background: var(--primary-blue);
+    color: #fff;
+    border-color: var(--primary-blue);
+}
+
+.pagination-controls button:disabled {
+    opacity: 0.4;
+    cursor: not-allowed;
 }
 
 .page-alert {

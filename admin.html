@@ -40,49 +40,80 @@
         <main class="main-content">
             <!-- СЕКЦИЯ 1: СТАТИСТИКА / ТАБЛО -->
             <section id="sec-dashboard" class="dashboard-section">
-                <div class="section-header">
-                    <h1>Статистика за предадените задачи</h1>
-                    <p class="subtitle">Проследете напредъка на учениците и резултатите от автоматичната проверка.</p>
+                <div class="section-header-row">
+                    <div class="section-header">
+                        <h1>Статистика за предадените задачи</h1>
+                        <p class="subtitle" style="margin-bottom:0;">Проследете напредъка на учениците и резултатите от автоматичната проверка.</p>
+                    </div>
+                    <button type="button" class="btn-secondary" style="margin-top:0; margin-left:0;" onclick="exportSubmissionsCSV()"><i class="fa-solid fa-download"></i> Експорт на данни</button>
                 </div>
 
                 <div class="filters-row">
                     <div class="filter-group">
                         <label for="filter-group">Филтър по клас:</label>
-                        <select id="filter-group" onchange="onFilterChange()" class="custom-select"></select>
+                        <div class="select-icon-wrap">
+                            <i class="fa-solid fa-user-group"></i>
+                            <select id="filter-group" onchange="onFilterChange()" class="custom-select"></select>
+                        </div>
                     </div>
                     <div class="filter-group">
                         <label for="filter-assignment">Задача:</label>
-                        <select id="filter-assignment" onchange="loadDashboardData()" class="custom-select"></select>
+                        <div class="select-icon-wrap">
+                            <i class="fa-regular fa-file-lines"></i>
+                            <select id="filter-assignment" onchange="loadDashboardData()" class="custom-select"></select>
+                        </div>
                     </div>
                 </div>
 
                 <div class="stats-grid">
                     <div class="stat-card">
-                        <div class="stat-icon blue"><i class="fa-solid fa-users"></i></div>
-                        <div class="stat-data">
-                            <span class="stat-title">Ученици с предадени задачи</span>
-                            <div class="stat-main">
-                                <strong id="stat-count">0</strong>
-                                <span class="stat-sub" id="stat-total-students">от 0 ученици</span>
+                        <div class="stat-left">
+                            <div class="stat-icon blue"><i class="fa-solid fa-users"></i></div>
+                            <div class="stat-data">
+                                <span class="stat-title">Ученици с предадени задачи</span>
+                                <div class="stat-main">
+                                    <strong id="stat-count">0</strong>
+                                    <span class="stat-sub" id="stat-total-students">от 0 ученици</span>
+                                </div>
                             </div>
+                        </div>
+                        <div class="avatar-cluster">
+                            <span class="avatar-circle a0"><i class="fa-solid fa-user"></i></span>
+                            <span class="avatar-circle a1"><i class="fa-solid fa-user"></i></span>
+                            <span class="avatar-circle a2"><i class="fa-solid fa-user"></i></span>
+                            <span class="avatar-check"><i class="fa-solid fa-check"></i></span>
                         </div>
                     </div>
 
                     <div class="stat-card">
-                        <div class="stat-icon green"><i class="fa-solid fa-chart-line"></i></div>
-                        <div class="stat-data">
-                            <span class="stat-title">Среден успех</span>
-                            <div class="stat-main">
-                                <strong id="stat-avg">0%</strong>
-                                <span class="stat-sub">0/100 точки</span>
+                        <div class="stat-left">
+                            <div class="stat-icon green"><i class="fa-solid fa-chart-line"></i></div>
+                            <div class="stat-data">
+                                <span class="stat-title">Среден успех</span>
+                                <div class="stat-main">
+                                    <strong id="stat-avg">0%</strong>
+                                    <span class="stat-sub" id="stat-avg-sub">0/100 точки</span>
+                                </div>
                             </div>
                         </div>
+                        <div class="progress-ring">
+                            <svg viewBox="0 0 64 64">
+                                <circle class="ring-track" cx="32" cy="32" r="27"></circle>
+                                <circle id="avg-ring-fill" class="ring-fill" cx="32" cy="32" r="27"></circle>
+                            </svg>
+                            <span class="progress-ring-label" id="avg-ring-label">0%</span>
+                        </div>
                     </div>
-
                 </div>
 
                 <div class="table-card">
-                    <h3>Резултати по ученици</h3>
+                    <div class="table-card-header">
+                        <h3 style="margin:0;">Резултати по ученици</h3>
+                        <div class="search-input-wrap">
+                            <i class="fa-solid fa-magnifying-glass"></i>
+                            <input type="text" id="submissions-search" placeholder="Търси ученик..." oninput="filterSubmissionsBySearch()">
+                        </div>
+                    </div>
                     <div class="table-responsive">
                         <table class="styled-table" id="submissions-table">
                             <thead>
@@ -99,6 +130,7 @@
                             <tbody></tbody>
                         </table>
                     </div>
+                    <div class="pagination-row" id="submissions-pagination"></div>
                 </div>
             </section>
 
@@ -136,14 +168,18 @@
                         </div>
                         <div class="form-group">
                             <label>Качете Word файл / Документ с критерии:</label>
-                            <div class="drop-zone" id="criteria-drop-zone">
-                                <i class="fa-solid fa-cloud-arrow-up drop-cloud-icon"></i>
-                                <p class="drop-text">Изберете файл</p>
-                                <span class="drop-subtext">или плъзнете файл тук</span>
+                            <div class="drop-zone drop-zone-row" id="criteria-drop-zone">
+                                <div class="drop-zone-row-left">
+                                    <i class="fa-solid fa-cloud-arrow-up drop-cloud-icon"></i>
+                                    <div>
+                                        <p class="drop-text">Изберете файл</p>
+                                        <span class="drop-subtext">или плъзнете файл тук</span>
+                                    </div>
+                                </div>
                                 <button type="button" class="btn-browse" onclick="document.getElementById('criteria-file-input').click()"><i class="fa-regular fa-folder-open"></i> Избор на файл</button>
                                 <input type="file" id="criteria-file-input" accept=".docx" hidden>
-                                <div id="criteria-file-name-display" class="selected-file-name"></div>
                             </div>
+                            <div id="criteria-file-name-display" class="selected-file-name"></div>
                         </div>
                         <button type="submit" class="btn-primary"><i class="fa-solid fa-plus"></i> Създай Задача</button>
                     </form>

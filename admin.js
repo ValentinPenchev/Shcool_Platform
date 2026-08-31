@@ -468,6 +468,11 @@ function onFilterChange() {
     loadDashboardData();
 }
 
+// Последно заредените предавания (по текущите филтри клас/задача), страница и брой на страница за пагинацията
+let submissionsCache = [];
+let submissionsCurrentPage = 1;
+let submissionsPageSize = 10;
+
 // Зареждане на данните за таблото (Dashboard)
 async function loadDashboardData() {
     const classId = document.getElementById("filter-group").value;
@@ -483,6 +488,7 @@ async function loadDashboardData() {
         const res = await fetch(url);
         if (!res.ok) throw new Error("Грешка при заявката към сървъра");
         const submissions = await res.json();
+        submissionsCache = submissions;
 
         let totalStudentsCount = 0;
         if (classId && classesData[classId]) {
@@ -494,53 +500,180 @@ async function loadDashboardData() {
         document.getElementById("stat-total-students").innerText = `от ${totalStudentsCount} ученици`;
 
         let totalScore = 0;
+        let totalMaxScore = 0;
         submissions.forEach(sub => {
             totalScore += (sub.score || 0);
+            totalMaxScore += (sub.max_score || 0);
         });
 
         const avgScore = submittedCount > 0 ? Math.round(totalScore / submittedCount) : 0;
+        const avgMaxPoints = submittedCount > 0 && totalMaxScore > 0 ? Math.round(totalMaxScore / submittedCount) : 100;
         document.getElementById("stat-avg").innerText = `${avgScore}%`;
+        document.getElementById("stat-avg-sub").innerText = `${avgScore}/${avgMaxPoints} точки`;
+        updateAverageRing(avgScore);
 
-        const tbody = document.querySelector("#submissions-table tbody");
-        tbody.innerHTML = "";
-
-        if (submissions.length === 0) {
-            tbody.innerHTML = `
-                <tr><td colspan="7">
-                    <div class="empty-state">
-                        <div class="empty-icon"><i class="fa-solid fa-inbox"></i></div>
-                        <h4>Няма предадени решения</h4>
-                        <p>Няма намерени предадени решения за избраните филтри.</p>
-                    </div>
-                </td></tr>
-            `;
-            return;
-        }
-
-        submissions.forEach((sub, index) => {
-            const statusBadge = 'Проверено';
-            const taskTitle = assignmentTitleById[sub.assignment_id] || (sub.assignment_id ? sub.assignment_id : '—');
-            const fileActions = (sub.file_url && sub.file_url !== '#')
-                ? `
-                    <a href="${sub.file_url}" target="_blank" rel="noopener" class="btn-icon" title="Отвори в нов прозорец"><i class="fa-regular fa-eye"></i></a>
-                    <a href="${sub.file_url}" download="${sub.filename || ''}" class="btn-icon" title="Свали материала"><i class="fa-solid fa-download"></i></a>
-                  `
-                : '<span class="stat-sub">Няма файл</span>';
-
-            tbody.innerHTML += `
-                <tr>
-                    <td>${index + 1}</td>
-                    <td><strong>${sub.student_name || 'Неизвестен'}</strong></td>
-                    <td>${taskTitle}</td>
-                    <td>${sub.filename || sub.file_name || 'Файл'}</td>
-                    <td><strong>${sub.score || 0}</strong> / ${sub.max_score || 100} точки</td>
-                    <td><span class="badge-status">${statusBadge}</span></td>
-                    <td>${fileActions}</td>
-                </tr>
-            `;
-        });
-
+        const searchInput = document.getElementById("submissions-search");
+        if (searchInput) searchInput.value = "";
+        submissionsCurrentPage = 1;
+        renderSubmissionsTable();
     } catch (err) {
         console.error("Грешка при зареждане на таблото:", err);
     }
+}
+
+// Обновява кръглия прогрес пръстен за средния успех
+function updateAverageRing(avgScore) {
+    const circle = document.getElementById("avg-ring-fill");
+    const label = document.getElementById("avg-ring-label");
+    if (!circle || !label) return;
+    const circumference = 2 * Math.PI * 27;
+    const offset = circumference - (Math.max(0, Math.min(100, avgScore)) / 100) * circumference;
+    circle.style.strokeDasharray = `${circumference}`;
+    circle.style.strokeDashoffset = `${offset}`;
+    label.textContent = `${avgScore}%`;
+}
+
+// Претърсва кешираните предавания по име на ученик
+function filterSubmissionsBySearch() {
+    submissionsCurrentPage = 1;
+    renderSubmissionsTable();
+}
+
+function getFilteredSubmissions() {
+    const searchInput = document.getElementById("submissions-search");
+    const term = searchInput ? searchInput.value.trim().toLowerCase() : "";
+    if (!term) return submissionsCache;
+    return submissionsCache.filter(sub => (sub.student_name || "").toLowerCase().includes(term));
+}
+
+// Рендва видимата страница от таблицата с резултати, включително пагинацията
+function renderSubmissionsTable() {
+    const tbody = document.querySelector("#submissions-table tbody");
+    const filtered = getFilteredSubmissions();
+
+    if (filtered.length === 0) {
+        tbody.innerHTML = `
+            <tr><td colspan="7">
+                <div class="empty-state">
+                    <div class="empty-icon"><i class="fa-solid fa-inbox"></i></div>
+                    <h4>Няма предадени решения</h4>
+                    <p>Няма намерени предадени решения за избраните филтри.</p>
+                </div>
+            </td></tr>
+        `;
+        renderSubmissionsPagination(0);
+        return;
+    }
+
+    const totalPages = Math.max(1, Math.ceil(filtered.length / submissionsPageSize));
+    if (submissionsCurrentPage > totalPages) submissionsCurrentPage = totalPages;
+    const start = (submissionsCurrentPage - 1) * submissionsPageSize;
+    const pageItems = filtered.slice(start, start + submissionsPageSize);
+
+    tbody.innerHTML = pageItems.map((sub, i) => {
+        const index = start + i;
+        const statusBadge = '<i class="fa-solid fa-check"></i> Проверено';
+        const taskTitle = assignmentTitleById[sub.assignment_id] || (sub.assignment_id ? sub.assignment_id : '—');
+        const studentName = sub.student_name || 'Неизвестен';
+        const fileActions = (sub.file_url && sub.file_url !== '#')
+            ? `
+                <a href="${sub.file_url}" target="_blank" rel="noopener" class="btn-icon" title="Отвори в нов прозорец"><i class="fa-regular fa-eye"></i></a>
+                <a href="${sub.file_url}" download="${sub.filename || ''}" class="btn-icon" title="Свали материала"><i class="fa-solid fa-download"></i></a>
+              `
+            : '<span class="stat-sub">Няма файл</span>';
+
+        return `
+            <tr>
+                <td>${index + 1}</td>
+                <td><span class="row-avatar a${index % 5}">${studentName.slice(0, 1).toUpperCase()}</span><strong>${studentName}</strong></td>
+                <td>${taskTitle}</td>
+                <td><div class="file-name-cell"><i class="fa-regular fa-file-lines"></i>${sub.filename || sub.file_name || 'Файл'}</div></td>
+                <td><strong>${sub.score || 0}</strong> / ${sub.max_score || 100} точки</td>
+                <td><span class="badge-status">${statusBadge}</span></td>
+                <td>${fileActions}</td>
+            </tr>
+        `;
+    }).join("");
+
+    renderSubmissionsPagination(filtered.length);
+}
+
+function renderSubmissionsPagination(totalCount) {
+    const container = document.getElementById("submissions-pagination");
+    if (!container) return;
+
+    if (totalCount === 0) {
+        container.innerHTML = "";
+        return;
+    }
+
+    const totalPages = Math.max(1, Math.ceil(totalCount / submissionsPageSize));
+    const start = (submissionsCurrentPage - 1) * submissionsPageSize + 1;
+    const end = Math.min(totalCount, submissionsCurrentPage * submissionsPageSize);
+
+    let pageButtons = "";
+    for (let p = 1; p <= totalPages; p++) {
+        pageButtons += `<button type="button" class="${p === submissionsCurrentPage ? 'active' : ''}" onclick="setSubmissionsPage(${p})">${p}</button>`;
+    }
+
+    container.innerHTML = `
+        <div>
+            Показване на
+            <select class="page-size-select" onchange="changeSubmissionsPageSize(this.value)">
+                ${[10, 20, 50].map(n => `<option value="${n}" ${n === submissionsPageSize ? 'selected' : ''}>${n}</option>`).join("")}
+            </select>
+            от ${totalCount} резултата (${start}-${end})
+        </div>
+        <div class="pagination-controls">
+            <button type="button" onclick="setSubmissionsPage(${submissionsCurrentPage - 1})" ${submissionsCurrentPage <= 1 ? 'disabled' : ''}><i class="fa-solid fa-chevron-left"></i></button>
+            ${pageButtons}
+            <button type="button" onclick="setSubmissionsPage(${submissionsCurrentPage + 1})" ${submissionsCurrentPage >= totalPages ? 'disabled' : ''}><i class="fa-solid fa-chevron-right"></i></button>
+        </div>
+    `;
+}
+
+function setSubmissionsPage(page) {
+    submissionsCurrentPage = page;
+    renderSubmissionsTable();
+}
+
+function changeSubmissionsPageSize(size) {
+    submissionsPageSize = parseInt(size, 10);
+    submissionsCurrentPage = 1;
+    renderSubmissionsTable();
+}
+
+// Експортира текущо филтрираните резултати като CSV файл
+function exportSubmissionsCSV() {
+    const rows = getFilteredSubmissions();
+    if (rows.length === 0) {
+        alert("Няма данни за експортиране.");
+        return;
+    }
+
+    const headers = ["Ученик", "Задача", "Клас", "Файл", "Точки", "Максимум точки", "Успех (%)"];
+    const csvRows = [headers.join(",")];
+    rows.forEach(sub => {
+        const taskTitle = assignmentTitleById[sub.assignment_id] || sub.assignment_id || "";
+        const values = [
+            sub.student_name || "",
+            taskTitle,
+            sub.class_id || "",
+            sub.filename || "",
+            sub.score || 0,
+            sub.max_score || 0,
+            sub.percentage || 0
+        ].map(v => `"${String(v).replace(/"/g, '""')}"`);
+        csvRows.push(values.join(","));
+    });
+
+    const blob = new Blob(["﻿" + csvRows.join("\n")], { type: "text/csv;charset=utf-8;" });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement("a");
+    link.href = url;
+    link.download = `rezultati_${new Date().toISOString().slice(0, 10)}.csv`;
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+    URL.revokeObjectURL(url);
 }

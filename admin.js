@@ -376,18 +376,12 @@ async function loadDashboardData() {
         document.getElementById("stat-total-students").innerText = `от ${totalStudentsCount} ученици`;
 
         let totalScore = 0;
-        let plagiarismCount = 0;
-
         submissions.forEach(sub => {
             totalScore += (sub.score || 0);
-            if (sub.plagiarism_flag) { 
-                plagiarismCount++;
-            }
         });
 
         const avgScore = submittedCount > 0 ? Math.round(totalScore / submittedCount) : 0;
         document.getElementById("stat-avg").innerText = `${avgScore}%`;
-        document.getElementById("stat-plagiarism").innerText = plagiarismCount;
 
         const tbody = document.querySelector("#submissions-table tbody");
         tbody.innerHTML = "";
@@ -398,8 +392,13 @@ async function loadDashboardData() {
         }
 
         submissions.forEach((sub, index) => {
-            const statusBadge = 'Проверено'; 
-            const plagiarismText = sub.plagiarism_flag ? '<span style="color: #dc2626; font-weight: 600;">Да</span>' : 'Не';
+            const statusBadge = 'Проверено';
+            const fileActions = (sub.file_url && sub.file_url !== '#')
+                ? `
+                    <a href="${sub.file_url}" target="_blank" rel="noopener" class="btn-icon" title="Отвори в нов прозорец"><i class="fa-regular fa-eye"></i></a>
+                    <a href="${sub.file_url}" download="${sub.filename || ''}" class="btn-icon" title="Свали материала"><i class="fa-solid fa-download"></i></a>
+                  `
+                : '<span class="stat-sub">Няма файл</span>';
 
             tbody.innerHTML += `
                 <tr>
@@ -407,8 +406,8 @@ async function loadDashboardData() {
                     <td><strong>${sub.student_name || 'Неизвестен'}</strong></td>
                     <td>${sub.filename || sub.file_name || 'Файл'}</td>
                     <td><strong>${sub.score || 0}</strong> / ${sub.max_score || 100} точки</td>
-                    <td>${plagiarismText}</td>
                     <td><span class="badge-status">${statusBadge}</span></td>
+                    <td>${fileActions}</td>
                 </tr>
             `;
         });

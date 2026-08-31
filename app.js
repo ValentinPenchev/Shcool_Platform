@@ -153,13 +153,5 @@ function showResult(result) {
     document.getElementById("result-max-score").textContent = result.max_score ?? 0;
     document.getElementById("result-percentage").textContent = `${result.percentage ?? 0}%`;
 
-    const plagiarismBox = document.getElementById("result-plagiarism");
-    if (result.plagiarism_flag) {
-        plagiarismBox.style.display = "block";
-        plagiarismBox.innerHTML = `<i class="fa-solid fa-triangle-exclamation"></i> Засечено е плагиатство: ${result.plagiarism_note || ""}`;
-    } else {
-        plagiarismBox.style.display = "none";
-    }
-
     document.getElementById("result-panel").style.display = "block";
 }

@@ -2,6 +2,7 @@ import io
 import json
 import hashlib
 import uuid
+import asyncio
 from typing import Optional
 from fastapi import FastAPI, UploadFile, File, Form, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
@@ -24,12 +25,21 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
+# Материалите се пазят 60 дни, след което се изтриват автоматично (файл + запис)
+CLEANUP_AFTER_DAYS = 60
+CLEANUP_INTERVAL_SECONDS = 24 * 60 * 60
+
+async def periodic_cleanup():
+    while True:
+        try:
+            cleanup_expired_files(CLEANUP_AFTER_DAYS)
+        except Exception as e:
+            print(f"Забележка при почистване: {e}")
+        await asyncio.sleep(CLEANUP_INTERVAL_SECONDS)
+
 @app.on_event("startup")
 async def startup_event():
-    try:
-        cleanup_expired_files(60)
-    except Exception as e:
-        print(f"Забележка при почистване: {e}")
+    asyncio.create_task(periodic_cleanup())
 
 @app.get("/api/health")
 async def health_check():
@@ -212,32 +222,13 @@ async def evaluate_file(
     file_hash = hashlib.md5(contents).hexdigest()
     meta = extract_office_metadata(contents)
     creation_time = meta.get("created")
-    
+
     storage_path = f"{class_id}/{student_name.replace(' ', '_')}_{file.filename}"
-    
+
     try:
         file_url = upload_to_supabase(contents, file.filename, storage_path)
     except Exception:
         file_url = "#"
-
-    plagiarism_flag = False
-    plagiarism_reason = "Няма съвпадения"
-
-    try:
-        prev_res = supabase.table("submissions").select("*").execute()
-        if prev_res.data:
-            for prev in prev_res.data:
-                if prev.get("student_name") != student_name:
-                    if prev.get("file_hash") == file_hash:
-                        plagiarism_flag = True
-                        plagiarism_reason = f"100% идентичен файл с този на {prev.get('student_name')} ({prev.get('class_id')})"
-                        break
-                    if creation_time and prev.get("creation_time") == str(creation_time):
-                        plagiarism_flag = True
-                        plagiarism_reason = f"Създаден в абсолютно същото време с файла на {prev.get('student_name')}"
-                        break
-    except Exception as e:
-        print(f"Забележка при плагиатство: {e}")
 
     filename = file.filename.lower()
     try:
@@ -268,8 +259,6 @@ async def evaluate_file(
         "score": result["score"],
         "max_score": result["max_score"],
         "percentage": percentage,
-        "plagiarism_flag": plagiarism_flag,
-        "plagiarism_note": plagiarism_reason,
         "details_json": result["details"]
     }
     
@@ -296,8 +285,6 @@ async def evaluate_file(
         "score": result["score"],
         "max_score": result["max_score"],
         "percentage": percentage,
-        "plagiarism_flag": plagiarism_flag,
-        "plagiarism_note": plagiarism_reason,
         "details": result["details"]
     }
 

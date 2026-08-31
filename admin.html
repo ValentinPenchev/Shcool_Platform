@@ -3,153 +3,209 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Учителско Табло - Оценяване</title>
+    <title>VPClassroom</title>
     <link rel="stylesheet" href="style.css">
-    <!-- Chart.js за графиките -->
-    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
 </head>
 <body>
 
-    <nav class="navbar">
-        <h2>Учителски Панел</h2>
-        <div class="nav-buttons">
-            <button class="nav-btn active" onclick="showSection('dashboard')">📊 Табло & Графики</button>
-            <button class="nav-btn" onclick="showSection('assignments')">🔗 Нова Задача & Линкове</button>
-            <button class="nav-btn" onclick="showSection('classes')">⚙️ Управление на Класове</button>
-        </div>
-    </nav>
-
-    <div class="container">
-
-        <!-- СЕКЦИЯ 1: ТАБЛО И ГРАФИКИ -->
-        <section id="sec-dashboard" class="panel-section">
-            <h3>Статистика за предадените задачи</h3>
-            
-            <div class="filter-bar">
-                <label for="filter-group">Филтър по Клас:</label>
-                <select id="filter-group" onchange="loadDashboardData()"></select>
+    <div class="app-layout">
+        <!-- ЛЯВА НАВИГАЦИОННА ЛЕНТА -->
+        <aside class="sidebar">
+            <div class="sidebar-brand">
+                <i class="fa-solid fa-book-open brand-icon"></i>
+                <h2>VPClassroom</h2>
             </div>
 
-            <div class="stats-cards">
-                <div class="card">
-                    <span class="card-label">Ученици с предадени задачи</span>
-                    <strong id="stat-count">0</strong>
-                </div>
-                <div class="card">
-                    <span class="card-label">Среден успех</span>
-                    <strong id="stat-avg">0%</strong>
-                </div>
-                <div class="card warning">
-                    <span class="card-label">Засечено плагиатство</span>
-                    <strong id="stat-plagiarism">0</strong>
-                </div>
-            </div>
+            <ul class="sidebar-menu">
+                <li id="menu-dashboard" class="active"><a href="#" onclick="showSection('dashboard')"><i class="fa-solid fa-chart-line"></i> Статистика</a></li>
+                <li id="menu-assignments"><a href="#" onclick="showSection('assignments')"><i class="fa-regular fa-clipboard"></i> Задачи</a></li>
+                <li id="menu-classes"><a href="#" onclick="showSection('classes')"><i class="fa-solid fa-user-group"></i> Ученици</a></li>
+            </ul>
 
-            <div class="chart-wrapper">
-                <div class="chart-container">
-                    <canvas id="scoresChart"></canvas>
-                </div>
-            </div>
-
-            <h4>Резултати по ученици</h4>
-            <div class="table-responsive">
-                <table id="submissions-table">
-                    <thead>
-                        <tr>
-                            <th>Ученик</th>
-                            <th>Файл</th>
-                            <th>Точки / Успех</th>
-                            <th>Плагиатство</th>
-                            <th>Сваляне</th>
-                        </tr>
-                    </thead>
-                    <tbody></tbody>
-                </table>
-            </div>
-        </section>
-
-        <!-- СЕКЦИЯ 2: НОВА ЗАДАЧА & ГЕНЕРИРАНЕ НА ЛИНК -->
-        <section id="sec-assignments" class="panel-section" style="display:none;">
-            <h3>Генериране на нова задача за клас</h3>
-            <form id="create-assignment-form" class="styled-form">
-                <div class="form-group">
-                    <label for="assign-group-select">Изберете Клас:</label>
-                    <select id="assign-group-select" required></select>
-                </div>
-
-                <div class="form-group">
-                    <label for="assign-title">Заглавие на задачата:</label>
-                    <input type="text" id="assign-title" placeholder="напр. Упражнение 1 - Форматиране" required>
-                </div>
-
-                <h4>Критерии за оценяване:</h4>
-                <div class="checkbox-group">
-                    <label class="checkbox-container">
-                        <input type="checkbox" id="crit-font">
-                        <span class="checkmark"></span>
-                        Задължителен шрифт (Times New Roman, 12pt)
-                    </label>
-                    <label class="checkbox-container">
-                        <input type="checkbox" id="crit-table">
-                        <span class="checkmark"></span>
-                        Изисква се таблица
-                    </label>
-                    <label class="checkbox-container">
-                        <input type="checkbox" id="crit-image">
-                        <span class="checkmark"></span>
-                        Изисква се изображение
-                    </label>
-                </div>
-
-                <button type="submit" class="btn-primary">Създай Задача & Генерирай Линк</button>
-            </form>
-
-            <div id="generated-link-box" style="display:none;" class="link-card">
-                <p><strong>Уникален линк за учениците:</strong></p>
-                <div class="link-input-group">
-                    <input type="text" id="generated-link-url" readonly>
-                    <button class="btn-secondary" onclick="copyLink()">Копирай</button>
-                </div>
-            </div>
-        </section>
-
-        <!-- СЕКЦИЯ 3: УПРАВЛЕНИЕ НА КЛАСОВЕ -->
-        <section id="sec-classes" class="panel-section" style="display:none;">
-            <h3>Добавяне на Нов Клас / Среда</h3>
-            
-            <form id="create-class-form" class="styled-form">
-                <div class="form-grid">
-                    <div class="form-group">
-                        <label for="class-id">Идентификатор:</label>
-                        <input type="text" id="class-id" placeholder="напр. 8a-grp1" required>
+            <div class="sidebar-footer">
+                <div class="class-selector-card">
+                    <i class="fa-solid fa-graduation-cap"></i>
+                    <div>
+                        <span class="label">Избран клас</span>
+                        <select id="sidebar-class-select" onchange="syncClassFilter(this.value)">
+                            <!-- Динамично попълване -->
+                        </select>
                     </div>
-                    <div class="form-group">
-                        <label for="class-name">Име на групата:</label>
-                        <input type="text" id="class-name" placeholder="напр. 8А - Първа група" required>
+                </div>
+            </div>
+        </aside>
+
+        <!-- ОСНОВНО СЪДЪРЖАНИЕ -->
+        <main class="main-content">
+            <!-- СЕКЦИЯ 1: СТАТИСТИКА / ТАБЛО -->
+            <section id="sec-dashboard" class="dashboard-section">
+                <div class="section-header">
+                    <h1>Статистика за предадените задачи</h1>
+                    <p class="subtitle">Проследете напредъка на учениците и резултатите от автоматичната проверка.</p>
+                </div>
+
+                <div class="filters-row">
+                    <div class="filter-group">
+                        <label for="filter-group">Филтър по клас:</label>
+                        <select id="filter-group" onchange="onFilterChange()" class="custom-select"></select>
+                    </div>
+                    <div class="filter-group">
+                        <label for="filter-assignment">Задача:</label>
+                        <select id="filter-assignment" onchange="loadDashboardData()" class="custom-select"></select>
                     </div>
                 </div>
 
-                <div class="form-group">
-                    <label for="class-names-text">Въвеждане на ученици (всяко име на нов ред):</label>
-                    <textarea id="class-names-text" placeholder="Иван Иванов&#10;Георги Петров..." rows="5"></textarea>
+                <div class="stats-grid">
+                    <div class="stat-card">
+                        <div class="stat-icon blue"><i class="fa-solid fa-users"></i></div>
+                        <div class="stat-data">
+                            <span class="stat-title">Ученици с предадени задачи</span>
+                            <div class="stat-main">
+                                <strong id="stat-count">0</strong>
+                                <span class="stat-sub" id="stat-total-students">от 0 ученици</span>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="stat-card">
+                        <div class="stat-icon green"><i class="fa-solid fa-chart-line"></i></div>
+                        <div class="stat-data">
+                            <span class="stat-title">Среден успех</span>
+                            <div class="stat-main">
+                                <strong id="stat-avg">0%</strong>
+                                <span class="stat-sub">0/100 точки</span>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="stat-card">
+                        <div class="stat-icon red"><i class="fa-solid fa-shield-halved"></i></div>
+                        <div class="stat-data">
+                            <span class="stat-title">Засечено плагиатство</span>
+                            <div class="stat-main">
+                                <strong id="stat-plagiarism" class="text-danger">0</strong>
+                                <span class="stat-sub">случая</span>
+                            </div>
+                        </div>
+                    </div>
                 </div>
-                
-                <div class="file-upload-divider">
-                    <span>ИЛИ</span>
+
+                <div class="table-card">
+                    <h3>Резултати по ученици</h3>
+                    <div class="table-responsive">
+                        <table class="styled-table" id="submissions-table">
+                            <thead>
+                                <tr>
+                                    <th>#</th>
+                                    <th>Ученик</th>
+                                    <th>Файл</th>
+                                    <th>Точки / Успех</th>
+                                    <th>Плагиатство</th>
+                                    <th>Статус</th>
+                                </tr>
+                            </thead>
+                            <tbody></tbody>
+                        </table>
+                    </div>
+                </div>
+            </section>
+
+            <!-- СЕКЦИЯ 2: УПРАВЛЕНИЕ НА ЗАДАЧИ -->
+            <section id="sec-assignments" class="dashboard-section" style="display:none;">
+                <div class="section-header">
+                    <h1>Управление на Задачи & Критерии</h1>
+                </div>
+                <div class="form-card">
+                    <form id="create-assignment-form" class="styled-form">
+                        <div class="form-group">
+                            <label>Изберете Клас:</label>
+                            <select id="assign-group-select" class="custom-select" required></select>
+                        </div>
+                        <div class="form-group">
+                            <label>Заглавие на задачата:</label>
+                            <input type="text" id="assign-title" class="custom-input" placeholder="напр. Упражнение 1 - MS Word" required>
+                        </div>
+                        <div class="form-group">
+                            <label>Качете Word файл (.docx) с критерии:</label>
+                            <input type="file" id="criteria-file-input" accept=".docx" class="custom-file-input">
+                        </div>
+                        <button type="submit" class="btn-primary">Създай Задача</button>
+                    </form>
                 </div>
 
-                <div class="form-group">
-                    <label for="class-excel-file">Качете Excel / CSV файл със списък:</label>
-                    <input type="file" id="class-excel-file" accept=".xlsx, .csv" class="file-input-custom">
+                <div class="table-card" style="margin-top: 25px;">
+                    <h3>Съществуващи Задачи</h3>
+                    
+                    <!-- НОВ ФИЛТЪР ПО КЛАС ЗА ТАБЛИЦАТА СЪС ЗАДАЧИ -->
+                    <div class="filter-group" style="margin-bottom: 15px; max-width: 300px;">
+                        <label for="filter-assignments-class">Филтрирай задачите по клас:</label>
+                        <select id="filter-assignments-class" onchange="filterAssignmentsTable()" class="custom-select">
+                            <option value="">Всички задачи</option>
+                        </select>
+                    </div>
+
+                    <div class="table-responsive">
+                        <table class="styled-table">
+                            <thead>
+                                <tr>
+                                    <th>Заглавие</th>
+                                    <th>Клас</th>
+                                    <th>Уникален линк за ученици</th>
+                                    <th>Действия</th>
+                                </tr>
+                            </thead>
+                            <tbody id="assignments-table-body"></tbody>
+                        </table>
+                    </div>
+                </div>
+            </section>
+
+            <!-- СЕКЦИЯ 3: УПРАВЛЕНИЕ НА КЛАСОВЕ -->
+            <section id="sec-classes" class="dashboard-section" style="display:none;">
+                <div class="section-header">
+                    <h1>Управление на Класове</h1>
+                </div>
+                <div class="form-card">
+                    <h3 id="class-form-title" style="margin-bottom: 15px;">Нов клас</h3>
+                    <form id="create-class-form" class="styled-form">
+                        <div class="form-grid">
+                            <div class="form-group">
+                                <label>Идентификатор (ID):</label>
+                                <input type="text" id="class-id" class="custom-input" placeholder="напр. 8a" required>
+                            </div>
+                            <div class="form-group">
+                                <label>Име на класа:</label>
+                                <input type="text" id="class-name" class="custom-input" placeholder="напр. 8А Клас" required>
+                            </div>
+                        </div>
+                        <div class="form-group">
+                            <label>Въвеждане на ученици (всяко име на нов ред):</label>
+                            <textarea id="class-names-text" class="custom-textarea" rows="4" placeholder="Иван Иванов&#10;Мария Петрова"></textarea>
+                        </div>
+                        <button type="submit" class="btn-primary" id="class-form-submit-btn">Запази Класа</button>
+                        <button type="button" class="btn-secondary" id="class-form-cancel-btn" onclick="cancelClassEdit()" style="display:none;">Отказ</button>
+                    </form>
                 </div>
 
-                <button type="submit" class="btn-primary">Запази Класа</button>
-            </form>
-
-            <h4>Налични Класове:</h4>
-            <ul id="classes-list" class="classes-list"></ul>
-        </section>
-
+                <div class="table-card" style="margin-top: 25px;">
+                    <h3>Налични Класове</h3>
+                    <div class="table-responsive">
+                        <table class="styled-table">
+                            <thead>
+                                <tr>
+                                    <th>Име</th>
+                                    <th>ID</th>
+                                    <th>Ученици</th>
+                                    <th>Действия</th>
+                                </tr>
+                            </thead>
+                            <tbody id="classes-table-body"></tbody>
+                        </table>
+                    </div>
+                </div>
+            </section>
+        </main>
     </div>
 
     <script src="admin.js"></script>

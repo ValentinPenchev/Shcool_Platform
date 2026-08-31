@@ -3,50 +3,103 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Предаване на Задача</title>
+    <title>VPClassroom - Предаване на материал</title>
     <link rel="stylesheet" href="style.css">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
 </head>
-<body>
-    <div class="upload-card">
-        <h2 id="task-title">Зареждане на задача...</h2>
-        <p class="subtitle" id="group-name-display" style="color: var(--text-muted); margin-bottom: 20px;"></p>
+<body class="student-body">
 
-        <form id="submission-form" class="styled-form">
-            <div class="form-group">
-                <label for="student-select">Изберете вашето име:</label>
-                <select id="student-select" required>
-                    <option value="">-- Изберете име от списъка --</option>
-                </select>
-            </div>
-
-            <div class="form-group">
-                <label for="file-input">Изберете файл (.docx, .xlsx, .pptx):</label>
-                <input type="file" id="file-input" accept=".docx, .xlsx, .pptx" required>
-            </div>
-
-            <button type="submit" id="submit-btn" class="btn-primary" style="width: 100%;">Качи и Оцени</button>
-        </form>
-
-        <div id="loader" class="hidden" style="margin-top: 20px; text-align: center;">
-            <p>⏳ Файлът се качва в облака и се оценява...</p>
+    <header class="app-header">
+        <div class="header-brand">
+            <i class="fa-solid fa-book-open brand-icon"></i>
+            <h2>VPClassroom</h2>
         </div>
+        <button class="btn-help"><i class="fa-regular fa-circle-question"></i> Помощ</button>
+    </header>
 
-        <!-- Секция за показване на резултата -->
-        <div id="result-box" class="hidden" style="margin-top: 25px;">
-            <h3>Резултат от проверката</h3>
-            <div class="score-badge">
-                <span id="score-percentage">0%</span>
-                <p id="score-points">(0 / 0 т.)</p>
+    <main class="page-container">
+        <div class="upload-card">
+            
+            <div class="card-header">
+                <div class="folder-illustration">
+                    <div class="folder-bg">
+                        <i class="fa-solid fa-cloud-arrow-up cloud-icon"></i>
+                    </div>
+                </div>
+                <h1>Предай своя материал</h1>
+                <p class="subtitle" id="assignment-subtitle">Избери клас, попълни информацията и качи файла си.</p>
             </div>
 
-            <div id="plagiarism-warning" class="warning-box hidden">
-                <strong>⚠️ Внимание:</strong> <span id="plagiarism-note"></span>
+            <div id="page-alert" class="page-alert" style="display:none;"></div>
+
+            <div id="result-panel" class="result-panel" style="display:none;">
+                <div class="result-icon success"><i class="fa-solid fa-circle-check"></i></div>
+                <h2>Материалът е предаден успешно!</h2>
+                <p class="subtitle" id="result-filename"></p>
+                <div class="result-score">
+                    <strong id="result-score-value">0</strong> / <span id="result-max-score">0</span> точки
+                    <span id="result-percentage" class="result-percentage">0%</span>
+                </div>
+                <div id="result-plagiarism" class="result-plagiarism" style="display:none;"></div>
             </div>
 
-            <h4 style="margin-top: 15px;">Детайли по критериите:</h4>
-            <ul id="details-list" style="list-style: none; padding-left: 0;"></ul>
+            <form id="submission-form">
+                <div class="form-field">
+                    <div class="field-icon-box">
+                        <i class="fa-regular fa-user"></i>
+                    </div>
+                    <div class="field-content">
+                        <label for="student-select">Вашето име</label>
+                        <select id="student-select" class="custom-select" required>
+                            <option value="" disabled selected>-- Изберете вашето име --</option>
+                        </select>
+                    </div>
+                </div>
+
+                <div class="form-field file-field-wrapper">
+                    <div class="field-icon-box">
+                        <i class="fa-regular fa-file"></i>
+                    </div>
+                    <div class="field-content">
+                        <label>Изберете файл (.docx, .xlsx, .pptx)</label>
+                        
+                        <div class="drop-zone" id="drop-zone">
+                            <i class="fa-solid fa-cloud-arrow-up drop-cloud-icon"></i>
+                            <p class="drop-text">Плъзнете и пуснете файла тук</p>
+                            <span class="drop-subtext">или</span>
+                            <button type="button" class="btn-browse" onclick="document.getElementById('file-input').click()">Избор на файл</button>
+                            <input type="file" id="file-input" accept=".docx, .xlsx, .pptx" hidden>
+                            <div id="file-name-display" class="selected-file-name"></div>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="info-banner">
+                    <div class="info-left">
+                        <i class="fa-solid fa-circle-info info-icon"></i>
+                        <div>
+                            <strong>Поддържани формати</strong>
+                            <p>Позволени са файлове с разширения: .docx, .xlsx, .pptx</p>
+                        </div>
+                    </div>
+                    <div class="format-badges">
+                        <span class="badge word">W</span>
+                        <span class="badge excel">X</span>
+                        <span class="badge powerpoint">P</span>
+                    </div>
+                </div>
+
+                <button type="submit" class="btn-submit" id="submit-btn">
+                    <i class="fa-solid fa-paper-plane"></i> Предай и оцени
+                </button>
+            </form>
+
+            <div class="security-note">
+                <i class="fa-solid fa-lock"></i> Вашият файл ще бъде проверен сигурно и поверително.
+            </div>
+
         </div>
-    </div>
+    </main>
 
     <script src="app.js"></script>
 </body>

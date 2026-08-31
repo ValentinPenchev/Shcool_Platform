@@ -20,11 +20,11 @@ def upload_to_supabase(file_bytes: bytes, filename: str, path_in_bucket: str) ->
     Качва файла в Supabase Storage и връща публичния линк за достъп/сваляне.
     """
     try:
-        # Качване на файла (поправено upsert: True като boolean)
+        # file_options стойностите се изпращат като HTTP хедъри, затова трябва да са низове, не bool
         supabase.storage.from_(BUCKET_NAME).upload(
             path=path_in_bucket,
             file=file_bytes,
-            file_options={"content-type": "application/octet-stream", "upsert": True}
+            file_options={"content-type": "application/octet-stream", "upsert": "true"}
         )
         
         # Генериране на публичен URL

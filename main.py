@@ -6,11 +6,9 @@ from typing import Optional
 from fastapi import FastAPI, UploadFile, File, Form, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 import pandas as pd
+import docx
 
-# Модул за връзка със Supabase и почистване
 from supabase_client import supabase, upload_to_supabase, cleanup_expired_files
-
-# Модули за проверка на файловете
 from evaluators.word_eval import evaluate_word
 from evaluators.excel_eval import evaluate_excel
 from evaluators.ppt_eval import evaluate_ppt
@@ -18,7 +16,6 @@ from evaluators.metadata import extract_office_metadata
 
 app = FastAPI(title="Office & Code Evaluator API")
 
-# Настройка на CORS - позволява заявки от Live Server и всякакви източници
 app.add_middleware(
     CORSMiddleware,
     allow_origins=["*"],
@@ -29,34 +26,26 @@ app.add_middleware(
 
 @app.on_event("startup")
 async def startup_event():
-    """При стартиране на сървъра се задейства почистването на файлове и записи по-стари от 60 дни."""
     try:
         cleanup_expired_files(60)
     except Exception as e:
-        print(f"Забележка при стартиране (почистване): {e}")
-
-# -----------------------------------------------------------------------------
-# 0. ПРОВЕРКА НА СЪСТОЯНИЕТО (HEALTH CHECK)
-# -----------------------------------------------------------------------------
+        print(f"Забележка при почистване: {e}")
 
 @app.get("/api/health")
 async def health_check():
-    """Тестов контролен маршрут за проверка дали сървърът работи."""
     return {"status": "ok", "message": "Backend is running"}
 
 # -----------------------------------------------------------------------------
-# 1. КЛАСОВЕ И СРЕДИ (GROUPS)
+# 1. УПРАВЛЕНИЕ НА КЛАСОВЕ (GROUPS - CRUD)
 # -----------------------------------------------------------------------------
 
 @app.get("/api/admin/groups")
 async def get_all_groups():
-    """Връща всички налични среди/групи от Supabase."""
     try:
         res = supabase.table("groups").select("*").execute()
         return res.data or []
     except Exception as e:
-        raise HTTPException(status_code=500, detail=f"Грешка при четене от базата данни: {str(e)}")
-
+        raise HTTPException(status_code=500, detail=f"Грешка при четене на класовете: {str(e)}")
 
 @app.post("/api/admin/groups")
 async def create_or_update_group(
@@ -65,9 +54,7 @@ async def create_or_update_group(
     students_json: Optional[str] = Form(None),
     file: Optional[UploadFile] = File(None)
 ):
-    """Създава или обновява клас чрез копиран текст или прикачен Excel/CSV файл."""
     students = []
-
     if students_json and students_json.strip():
         try:
             parsed = json.loads(students_json)
@@ -91,9 +78,6 @@ async def create_or_update_group(
         except Exception as e:
             raise HTTPException(status_code=400, detail=f"Грешка при четене на файла: {str(e)}")
 
-    if not students:
-        raise HTTPException(status_code=400, detail="Няма намерени имена на ученици. Въведете ги на нови редове или качете Excel файл.")
-
     data = {
         "group_id": group_id,
         "group_name": group_name,
@@ -104,25 +88,65 @@ async def create_or_update_group(
         res = supabase.table("groups").upsert(data).execute()
         return {"status": "success", "data": res.data}
     except Exception as e:
-        raise HTTPException(status_code=500, detail=f"Грешка при запис в Supabase: {str(e)}")
+        raise HTTPException(status_code=500, detail=f"Грешка при запис в базата: {str(e)}")
+
+@app.delete("/api/admin/groups/{group_id}")
+async def delete_group(group_id: str):
+    try:
+        supabase.table("groups").delete().eq("group_id", group_id).execute()
+        return {"status": "success", "message": f"Класът {group_id} е изтрит."}
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Грешка при изтриване на класа: {str(e)}")
 
 # -----------------------------------------------------------------------------
-# 2. ЗАДАЧИ И ЛИНКОВЕ (ASSIGNMENTS)
+# 2. УПРАВЛЕНИЕ НА ЗАДАЧИ (ASSIGNMENTS - CRUD & FILE CRITERIA)
 # -----------------------------------------------------------------------------
+
+@app.get("/api/admin/assignments")
+async def get_all_assignments(group_id: Optional[str] = None):
+    try:
+        query = supabase.table("assignments").select("*")
+        if group_id:
+            query = query.eq("group_id", group_id)
+        res = query.execute()
+        assignments = res.data or []
+
+        # Формиране на дигиталната структура за всеки запис
+        for a in assignments:
+            task_id = a.get("id", "")
+            a["link"] = f"/index.html?id={task_id}" if task_id else ""
+
+        return assignments
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Грешка при четене на задачите: {str(e)}")
 
 @app.post("/api/admin/assignments")
 async def create_assignment(
     title: str = Form(...),
     group_id: str = Form(...),
-    criteria_json: str = Form(...)
+    criteria_json: Optional[str] = Form(None),
+    criteria_file: Optional[UploadFile] = File(None)
 ):
-    """Създава нова задача за клас и генерира уникален код/линк."""
     assignment_id = str(uuid.uuid4())[:8]
-    
-    try:
-        criteria_parsed = json.loads(criteria_json)
-    except Exception:
-        criteria_parsed = {}
+    criteria_parsed = {}
+
+    if criteria_file and criteria_file.filename.lower().endswith(".docx"):
+        try:
+            content = await criteria_file.read()
+            doc = docx.Document(io.BytesIO(content))
+            extracted_texts = [p.text.strip() for p in doc.paragraphs if p.text.strip()]
+            
+            criteria_parsed = {
+                f"criterion_{i+1}": {"description": text, "points": 1, "enabled": True}
+                for i, text in enumerate(extracted_texts)
+            }
+        except Exception as e:
+            raise HTTPException(status_code=400, detail=f"Грешка при четене на Word файла: {str(e)}")
+    elif criteria_json and criteria_json.strip():
+        try:
+            criteria_parsed = json.loads(criteria_json)
+        except Exception:
+            criteria_parsed = {}
 
     data = {
         "id": assignment_id,
@@ -132,19 +156,27 @@ async def create_assignment(
     }
     
     try:
-        supabase.table("assignments").insert(data).execute()
+        supabase.table("assignments").upsert(data).execute()
         return {
             "status": "success",
             "assignment_id": assignment_id,
-            "link": f"/index.html?task={assignment_id}"
+            "title": title,
+            "group_id": group_id,
+            "link": f"/index.html?id={assignment_id}"
         }
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Грешка при създаване на задача: {str(e)}")
 
+@app.delete("/api/admin/assignments/{assignment_id}")
+async def delete_assignment(assignment_id: str):
+    try:
+        supabase.table("assignments").delete().eq("id", assignment_id).execute()
+        return {"status": "success", "message": f"Задачата {assignment_id} е изтрита."}
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Грешка при изтриване на задачата: {str(e)}")
 
 @app.get("/api/assignments/{assignment_id}")
 async def get_assignment(assignment_id: str):
-    """Зарежда информацията за конкретната задача за ученическия панел."""
     res = supabase.table("assignments").select("*").eq("id", assignment_id).execute()
     if not res.data:
         raise HTTPException(status_code=404, detail="Задачата не е намерена.")
@@ -165,7 +197,7 @@ async def get_assignment(assignment_id: str):
     }
 
 # -----------------------------------------------------------------------------
-# 3. ОЦЕНЯВАНЕ И ТАБЛО (EVALUATION & SUBMISSIONS)
+# 3. ОЦЕНЯВАНЕ И ТАБЛО (SUBMISSIONS)
 # -----------------------------------------------------------------------------
 
 @app.post("/api/evaluate")
@@ -173,11 +205,10 @@ async def evaluate_file(
     class_id: str = Form(...),
     student_name: str = Form(...),
     criteria_json: str = Form(...),
+    assignment_id: Optional[str] = Form(None),
     file: UploadFile = File(...)
 ):
-    """Извършва оценка, проверка за плагиатство и запазва резултата."""
     contents = await file.read()
-    
     file_hash = hashlib.md5(contents).hexdigest()
     meta = extract_office_metadata(contents)
     creation_time = meta.get("created")
@@ -206,7 +237,7 @@ async def evaluate_file(
                         plagiarism_reason = f"Създаден в абсолютно същото време с файла на {prev.get('student_name')}"
                         break
     except Exception as e:
-        print(f"Забележка при проверка за плагиатство: {e}")
+        print(f"Забележка при плагиатство: {e}")
 
     filename = file.filename.lower()
     try:
@@ -221,13 +252,14 @@ async def evaluate_file(
     elif filename.endswith(".pptx"):
         result = evaluate_ppt(contents, criteria)
     else:
-        raise HTTPException(status_code=400, detail="Форматът не се поддържа. Качете .docx, .xlsx или .pptx файл.")
+        raise HTTPException(status_code=400, detail="Форматът не се поддържа.")
 
     percentage = round((result["score"] / result["max_score"] * 100), 1) if result["max_score"] > 0 else 0
 
     submission_data = {
         "student_name": student_name,
         "class_id": class_id,
+        "assignment_id": assignment_id,
         "filename": file.filename,
         "file_url": file_url,
         "storage_path": storage_path,
@@ -244,7 +276,17 @@ async def evaluate_file(
     try:
         supabase.table("submissions").insert(submission_data).execute()
     except Exception as e:
-        print(f"Грешка при записа на резултата в базата: {e}")
+        err_str = str(e)
+        if "assignment_id" in err_str and ("does not exist" in err_str or "Could not find" in err_str):
+            # Базата данни все още няма колона assignment_id - записваме без нея,
+            # за да не се губят предадените материали, докато схемата не бъде обновена.
+            fallback_data = {k: v for k, v in submission_data.items() if k != "assignment_id"}
+            try:
+                supabase.table("submissions").insert(fallback_data).execute()
+            except Exception as e2:
+                print(f"Грешка при запис на предаването (fallback): {e2}")
+        else:
+            print(f"Грешка при запис на предаването: {e}")
 
     return {
         "student_name": student_name,
@@ -259,19 +301,26 @@ async def evaluate_file(
         "details": result["details"]
     }
 
-
 @app.get("/api/admin/submissions")
-async def get_submissions(group_id: Optional[str] = None):
-    """Извлича предадените задачи за таблото."""
+async def get_submissions(group_id: Optional[str] = None, assignment_id: Optional[str] = None):
     try:
         query = supabase.table("submissions").select("*")
         if group_id:
             query = query.eq("class_id", group_id)
+        if assignment_id:
+            query = query.eq("assignment_id", assignment_id)
         res = query.execute()
         return res.data or []
     except Exception as e:
-        raise HTTPException(status_code=500, detail=f"Грешка при четене на предадените задачи: {str(e)}")
-
-if __name__ == "__main__":
-    import uvicorn
-    uvicorn.run("main:app", host="0.0.0.0", port=8000, reload=True)
+        err_str = str(e)
+        if assignment_id and "assignment_id" in err_str and ("does not exist" in err_str or "Could not find" in err_str):
+            # Базата данни все още няма колона assignment_id - връщаме резултатите само по клас.
+            try:
+                query = supabase.table("submissions").select("*")
+                if group_id:
+                    query = query.eq("class_id", group_id)
+                res = query.execute()
+                return res.data or []
+            except Exception as e2:
+                raise HTTPException(status_code=500, detail=f"Грешка при четене: {str(e2)}")
+        raise HTTPException(status_code=500, detail=f"Грешка при четене: {err_str}")

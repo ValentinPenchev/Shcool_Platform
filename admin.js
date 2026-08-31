@@ -191,9 +191,18 @@ async function loadAssignments(selectedClassFilter = "") {
     }
 }
 
+// Пътят на текущата страница (без файла), за да работи линкът и при хостване в подпапка (напр. GitHub Pages project site)
+function getSiteBasePath() {
+    return window.location.pathname.replace(/[^/]*$/, '');
+}
+
+function buildStudentLink(assignmentId) {
+    return `${window.location.origin}${getSiteBasePath()}index.html?id=${assignmentId}`;
+}
+
 // Маркъп на един ред в таблицата със задачи, включително уникалния линк за ученици
 function renderAssignmentRow(a) {
-    const studentUrl = `${window.location.origin}/index.html?id=${a.id}`;
+    const studentUrl = buildStudentLink(a.id);
     return `
         <tr id="assignment-row-${a.id}">
             <td><strong>${a.title}</strong></td>
@@ -208,7 +217,7 @@ function renderAssignmentRow(a) {
 }
 
 function copyAssignmentLink(assignmentId) {
-    const url = `${window.location.origin}/index.html?id=${assignmentId}`;
+    const url = buildStudentLink(assignmentId);
     navigator.clipboard?.writeText(url).then(() => {
         alert("Линкът е копиран: " + url);
     }).catch(() => {

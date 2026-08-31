@@ -89,6 +89,7 @@
                                 <tr>
                                     <th>#</th>
                                     <th>Ученик</th>
+                                    <th>Задача</th>
                                     <th>Файл</th>
                                     <th>Точки / Успех</th>
                                     <th>Статус</th>
@@ -103,35 +104,69 @@
 
             <!-- СЕКЦИЯ 2: УПРАВЛЕНИЕ НА ЗАДАЧИ -->
             <section id="sec-assignments" class="dashboard-section" style="display:none;">
-                <div class="section-header">
-                    <h1>Управление на Задачи & Критерии</h1>
+                <div class="section-header-row">
+                    <div class="section-header">
+                        <h1>Управление на Задачи & Критерии</h1>
+                        <p class="subtitle" style="margin-bottom:0;">Създавайте задачи и критерии за оценяване, следете напредъка на учениците.</p>
+                    </div>
+                    <div class="tip-card compact">
+                        <i class="fa-regular fa-lightbulb tip-icon"></i>
+                        <div>
+                            <strong>Съвет</strong>
+                            <p>Използвайте критерии, за да оценявате справедливо и последователно.</p>
+                        </div>
+                    </div>
                 </div>
+
                 <div class="form-card">
+                    <div class="card-title-row">
+                        <div class="icon-chip purple"><i class="fa-regular fa-file-lines"></i></div>
+                        <h3>Създай Задача</h3>
+                    </div>
                     <form id="create-assignment-form" class="styled-form">
-                        <div class="form-group">
-                            <label>Изберете Клас:</label>
-                            <select id="assign-group-select" class="custom-select" required></select>
+                        <div class="form-grid">
+                            <div class="form-group">
+                                <label>Изберете Клас:</label>
+                                <select id="assign-group-select" class="custom-select" required></select>
+                            </div>
+                            <div class="form-group">
+                                <label>Заглавие на задачата:</label>
+                                <input type="text" id="assign-title" class="custom-input" placeholder="напр. Упражнение 1 - MS Word" required>
+                            </div>
                         </div>
                         <div class="form-group">
-                            <label>Заглавие на задачата:</label>
-                            <input type="text" id="assign-title" class="custom-input" placeholder="напр. Упражнение 1 - MS Word" required>
+                            <label>Качете Word файл / Документ с критерии:</label>
+                            <div class="drop-zone" id="criteria-drop-zone">
+                                <i class="fa-solid fa-cloud-arrow-up drop-cloud-icon"></i>
+                                <p class="drop-text">Изберете файл</p>
+                                <span class="drop-subtext">или плъзнете файл тук</span>
+                                <button type="button" class="btn-browse" onclick="document.getElementById('criteria-file-input').click()"><i class="fa-regular fa-folder-open"></i> Избор на файл</button>
+                                <input type="file" id="criteria-file-input" accept=".docx" hidden>
+                                <div id="criteria-file-name-display" class="selected-file-name"></div>
+                            </div>
                         </div>
-                        <div class="form-group">
-                            <label>Качете Word файл (.docx) с критерии:</label>
-                            <input type="file" id="criteria-file-input" accept=".docx" class="custom-file-input">
-                        </div>
-                        <button type="submit" class="btn-primary">Създай Задача</button>
+                        <button type="submit" class="btn-primary"><i class="fa-solid fa-plus"></i> Създай Задача</button>
                     </form>
                 </div>
 
                 <div class="table-card" style="margin-top: 25px;">
-                    <h3>Съществуващи Задачи</h3>
-                    
-                    <!-- НОВ ФИЛТЪР ПО КЛАС ЗА ТАБЛИЦАТА СЪС ЗАДАЧИ -->
-                    <div class="filter-group" style="margin-bottom: 15px; max-width: 300px;">
-                        <label for="filter-assignments-class">Филтрирай задачите по клас:</label>
+                    <div class="table-card-header">
+                        <div class="card-title-row">
+                            <div class="icon-chip green"><i class="fa-solid fa-list-check"></i></div>
+                            <div>
+                                <h3>Съществуващи Задачи</h3>
+                                <div class="card-subtitle">Филтрирайте задачите по клас</div>
+                            </div>
+                        </div>
+                        <div class="search-input-wrap">
+                            <i class="fa-solid fa-magnifying-glass"></i>
+                            <input type="text" id="assignments-search" placeholder="Търси задача..." oninput="filterAssignmentsBySearch()">
+                        </div>
+                    </div>
+
+                    <div class="filter-group" style="margin: 15px 0; max-width: 300px;">
                         <select id="filter-assignments-class" onchange="filterAssignmentsTable()" class="custom-select">
-                            <option value="">Всички задачи</option>
+                            <option value="">Всички класове</option>
                         </select>
                     </div>
 
@@ -141,7 +176,7 @@
                                 <tr>
                                     <th>Заглавие</th>
                                     <th>Клас</th>
-                                    <th>Уникален линк за ученици</th>
+                                    <th>Линк</th>
                                     <th>Действия</th>
                                 </tr>
                             </thead>
@@ -155,36 +190,49 @@
             <section id="sec-classes" class="dashboard-section" style="display:none;">
                 <div class="section-header">
                     <h1>Управление на Класове</h1>
+                    <p class="subtitle">Създавайте и управлявайте своите класове и ученици</p>
                 </div>
                 <div class="form-card">
-                    <h3 id="class-form-title" style="margin-bottom: 15px;">Нов клас</h3>
+                    <div class="card-title-row">
+                        <div class="icon-chip purple"><i class="fa-solid fa-user-group"></i></div>
+                        <h3 id="class-form-title">Добави нов клас</h3>
+                    </div>
                     <form id="create-class-form" class="styled-form">
-                        <div class="form-grid">
+                        <div class="form-grid form-grid-3">
                             <div class="form-group">
-                                <label>Идентификатор (ID):</label>
+                                <label>Идентификатор (ID)</label>
                                 <input type="text" id="class-id" class="custom-input" placeholder="напр. 8a" required>
                             </div>
                             <div class="form-group">
-                                <label>Име на класа:</label>
+                                <label>Име на класа</label>
                                 <input type="text" id="class-name" class="custom-input" placeholder="напр. 8А Клас" required>
                             </div>
+                            <div class="form-group">
+                                <label>Въвеждане на ученици (всяко име на нов ред)</label>
+                                <textarea id="class-names-text" class="custom-textarea" rows="4" placeholder="Иван Иванов&#10;Мария Петрова&#10;..."></textarea>
+                            </div>
                         </div>
-                        <div class="form-group">
-                            <label>Въвеждане на ученици (всяко име на нов ред):</label>
-                            <textarea id="class-names-text" class="custom-textarea" rows="4" placeholder="Иван Иванов&#10;Мария Петрова"></textarea>
-                        </div>
-                        <button type="submit" class="btn-primary" id="class-form-submit-btn">Запази Класа</button>
+                        <button type="submit" class="btn-primary" id="class-form-submit-btn"><i class="fa-solid fa-plus"></i> Запази Класа</button>
                         <button type="button" class="btn-secondary" id="class-form-cancel-btn" onclick="cancelClassEdit()" style="display:none;">Отказ</button>
                     </form>
                 </div>
 
                 <div class="table-card" style="margin-top: 25px;">
-                    <h3>Налични Класове</h3>
+                    <div class="table-card-header">
+                        <div class="card-title-row">
+                            <div class="icon-chip purple"><i class="fa-solid fa-user-group"></i></div>
+                            <h3>Налични Класове</h3>
+                        </div>
+                        <div class="search-input-wrap">
+                            <i class="fa-solid fa-magnifying-glass"></i>
+                            <input type="text" id="classes-search" placeholder="Търси клас..." oninput="filterClassesBySearch()">
+                        </div>
+                    </div>
                     <div class="table-responsive">
                         <table class="styled-table">
                             <thead>
                                 <tr>
-                                    <th>Име</th>
+                                    <th>Име на клас</th>
                                     <th>ID</th>
                                     <th>Ученици</th>
                                     <th>Действия</th>
@@ -193,6 +241,14 @@
                             <tbody id="classes-table-body"></tbody>
                         </table>
                     </div>
+                </div>
+
+                <div class="tip-banner">
+                    <div>
+                        <strong>Съвет</strong>
+                        <p>Създавайте класове и добавяйте учениците си лесно. Можете да управлявате всички класове от тук.</p>
+                    </div>
+                    <i class="fa-solid fa-graduation-cap tip-illustration"></i>
                 </div>
             </section>
         </main>

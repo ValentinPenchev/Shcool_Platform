@@ -149,9 +149,204 @@ body {
 }
 
 /* ОБЩИ КОМПОНЕНТИ И ФОРМИ */
+.section-header-row {
+    display: flex;
+    justify-content: space-between;
+    align-items: flex-start;
+    gap: 20px;
+    margin-bottom: 20px;
+}
+
 .dashboard-section .section-header h1 {
     font-size: 22px;
     font-weight: 700;
+}
+
+/* "Съвет" карти */
+.tip-card {
+    background: #eff6ff;
+    border: 1px solid #dbeafe;
+    border-radius: 12px;
+    padding: 14px 18px;
+    display: flex;
+    gap: 12px;
+    align-items: flex-start;
+    flex-shrink: 0;
+}
+
+.tip-card.compact {
+    max-width: 300px;
+}
+
+.tip-card .tip-icon {
+    color: var(--primary-blue);
+    font-size: 18px;
+    margin-top: 2px;
+}
+
+.tip-card strong {
+    display: block;
+    font-size: 13px;
+    color: var(--text-dark);
+    margin-bottom: 2px;
+}
+
+.tip-card p {
+    font-size: 12px;
+    color: var(--text-muted);
+    line-height: 1.4;
+}
+
+.tip-banner {
+    background: #eff6ff;
+    border: 1px solid #dbeafe;
+    border-radius: 12px;
+    padding: 18px 24px;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    gap: 20px;
+    margin-top: 20px;
+}
+
+.tip-banner .tip-illustration {
+    font-size: 36px;
+    color: var(--primary-blue);
+    opacity: 0.8;
+    flex-shrink: 0;
+}
+
+/* Икона-чип, използван в заглавията на карти */
+.icon-chip {
+    width: 40px;
+    height: 40px;
+    border-radius: 10px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 17px;
+    flex-shrink: 0;
+}
+
+.icon-chip.blue { background: #eff6ff; color: var(--primary-blue); }
+.icon-chip.green { background: #f0fdf4; color: #16a34a; }
+.icon-chip.purple { background: #f5f3ff; color: #7c3aed; }
+.icon-chip.orange { background: #fff7ed; color: #ea580c; }
+
+.card-title-row {
+    display: flex;
+    align-items: center;
+    gap: 14px;
+    margin-bottom: 20px;
+}
+
+.card-title-row h3 {
+    font-size: 16px;
+    font-weight: 700;
+    color: var(--text-dark);
+}
+
+.card-title-row .card-subtitle {
+    font-size: 12px;
+    color: var(--text-muted);
+    margin-top: 2px;
+}
+
+.table-card-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    gap: 16px;
+    flex-wrap: wrap;
+    margin-bottom: 6px;
+}
+
+.table-card-header .card-title-row {
+    margin-bottom: 0;
+}
+
+.search-input-wrap {
+    position: relative;
+    min-width: 220px;
+}
+
+.search-input-wrap i {
+    position: absolute;
+    left: 12px;
+    top: 50%;
+    transform: translateY(-50%);
+    color: var(--text-muted);
+    font-size: 13px;
+}
+
+.search-input-wrap input {
+    width: 100%;
+    padding: 8px 12px 8px 34px;
+    border: 1px solid var(--border-color);
+    border-radius: 8px;
+    font-size: 13px;
+    outline: none;
+    background: #fff;
+}
+
+.search-input-wrap input:focus {
+    border-color: var(--primary-blue);
+}
+
+/* Цветни кръгли значки за класове */
+.class-badge {
+    width: 34px;
+    height: 34px;
+    border-radius: 50%;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 12px;
+    font-weight: 700;
+    margin-right: 10px;
+    flex-shrink: 0;
+}
+
+.class-badge.c0 { background: #eff6ff; color: var(--primary-blue); }
+.class-badge.c1 { background: #f0fdf4; color: #16a34a; }
+.class-badge.c2 { background: #fff7ed; color: #ea580c; }
+.class-badge.c3 { background: #f5f3ff; color: #7c3aed; }
+.class-badge.c4 { background: #fef2f2; color: #dc2626; }
+
+.class-name-cell {
+    display: flex;
+    align-items: center;
+}
+
+/* Празно състояние на таблици */
+.empty-state {
+    text-align: center;
+    padding: 40px 20px;
+}
+
+.empty-state .empty-icon {
+    width: 56px;
+    height: 56px;
+    border-radius: 50%;
+    background: #eff6ff;
+    color: var(--primary-blue);
+    font-size: 22px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    margin: 0 auto 14px;
+}
+
+.empty-state h4 {
+    font-size: 14px;
+    font-weight: 700;
+    color: var(--text-dark);
+    margin-bottom: 4px;
+}
+
+.empty-state p {
+    font-size: 12px;
+    color: var(--text-muted);
 }
 
 .subtitle {
@@ -165,6 +360,30 @@ body {
     display: flex;
     gap: 15px;
     margin-bottom: 20px;
+}
+
+.styled-form {
+    display: flex;
+    flex-direction: column;
+    gap: 16px;
+}
+
+.form-group label {
+    display: block;
+    font-size: 13px;
+    font-weight: 600;
+    color: var(--text-dark);
+}
+
+.form-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 16px;
+}
+
+.form-grid-3 {
+    grid-template-columns: 1fr 1fr 1.4fr;
+    align-items: start;
 }
 
 .custom-select, .custom-input, .custom-textarea {
@@ -263,6 +482,9 @@ body {
     cursor: pointer;
     font-weight: 600;
     margin-top: 10px;
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
 }
 
 .btn-primary:disabled {

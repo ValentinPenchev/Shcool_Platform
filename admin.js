@@ -1,8 +1,12 @@
 const API_URL = "https://shcool-platform.onrender.com/api";
 
-document.addEventListener("DOMContentLoaded", () => {
-    loadClasses();
-    loadAssignments();
+document.addEventListener("DOMContentLoaded", async () => {
+    // Изчакваме класовете и задачите, за да са налични имената им (напр. в колоната "Задача"),
+    // преди първото зареждане на статистиката
+    await Promise.all([loadClasses(), loadAssignments()]);
+    loadDashboardData();
+    startDashboardPolling();
+    setupCriteriaDropZone();
 });
 
 // Превключване между секциите в интерфейса
@@ -13,10 +17,21 @@ function showSection(sectionId) {
     document.querySelectorAll('.sidebar-menu li').forEach(li => li.classList.remove('active'));
     const activeMenu = document.getElementById(`menu-${sectionId}`);
     if (activeMenu) activeMenu.classList.add('active');
+
+    // Статистиката се презарежда автоматично при отваряне и се опреснява периодично,
+    // за да не се налага ръчно презареждане при ново предадено решение
+    if (sectionId === 'dashboard') {
+        loadDashboardData();
+        startDashboardPolling();
+    } else {
+        stopDashboardPolling();
+    }
 }
 
 // Локално кеширани данни за класовете (пълния списък ученици за нуждите на редакция)
 const classesData = {};
+// Локално кеширани заглавия на задачите, за да се показват в таблото със статистика
+const assignmentTitleById = {};
 
 // Зареждане на класовете от базата данни
 async function loadClasses() {
@@ -34,7 +49,6 @@ async function loadClasses() {
         filterGroup.innerHTML = '<option value="">Всички класове</option>';
         assignGroupSelect.innerHTML = "";
         if(filterAssignmentsClass) filterAssignmentsClass.innerHTML = '<option value="">Всички класове</option>';
-        classesTable.innerHTML = "";
 
         classes.forEach(c => {
             const classId = c.group_id || c.id;
@@ -46,27 +60,66 @@ async function loadClasses() {
             filterGroup.innerHTML += `<option value="${classId}">${className}</option>`;
             assignGroupSelect.innerHTML += `<option value="${classId}">${className}</option>`;
             if(filterAssignmentsClass) filterAssignmentsClass.innerHTML += `<option value="${classId}">${className}</option>`;
-
-            classesTable.innerHTML += renderClassRow(classId, className, classStudents.length);
         });
+
+        renderClassesTable(Object.entries(classesData));
     } catch (err) {
         console.error("Грешка при зареждане на класовете:", err);
     }
 }
 
+// Рендва цялото тяло на таблицата с класове от подаден списък от [classId, data] двойки
+function renderClassesTable(entries) {
+    const classesTable = document.getElementById("classes-table-body");
+    if (entries.length === 0) {
+        classesTable.innerHTML = `
+            <tr><td colspan="4">
+                <div class="empty-state">
+                    <div class="empty-icon"><i class="fa-solid fa-inbox"></i></div>
+                    <h4>Няма намерени класове</h4>
+                    <p>Създайте първия клас, за да го видите тук.</p>
+                </div>
+            </td></tr>
+        `;
+        return;
+    }
+    classesTable.innerHTML = entries
+        .map(([classId, data], index) => renderClassRow(classId, data.className, (data.students || []).length, index))
+        .join("");
+}
+
+// Цветова значка за клас (циклично по индекс в списъка)
+function classBadgeColorIndex(index) {
+    return `c${index % 5}`;
+}
+
 // Маркъп на един ред в таблицата с класове
-function renderClassRow(classId, className, studentsCount) {
+function renderClassRow(classId, className, studentsCount, colorIndex = 0) {
     return `
         <tr id="class-row-${classId}">
-            <td><strong>${className}</strong></td>
+            <td>
+                <div class="class-name-cell">
+                    <span class="class-badge ${classBadgeColorIndex(colorIndex)}">${(className || classId).slice(0, 2)}</span>
+                    <strong>${className}</strong>
+                </div>
+            </td>
             <td>${classId}</td>
-            <td>${studentsCount} ученици</td>
+            <td><i class="fa-solid fa-user-group" style="color: var(--text-muted); margin-right: 6px;"></i>${studentsCount} ученици</td>
             <td>
                 <button type="button" class="btn-icon" onclick="editClass('${classId}')" title="Редактирай класа"><i class="fa-regular fa-pen-to-square"></i></button>
                 <button type="button" class="btn-danger-icon" onclick="deleteClass('${classId}')" title="Изтрий класа"><i class="fa-regular fa-trash-can"></i></button>
             </td>
         </tr>
     `;
+}
+
+// Претърсва локално кешираните класове по име или ID
+function filterClassesBySearch() {
+    const term = document.getElementById("classes-search").value.trim().toLowerCase();
+    const entries = Object.entries(classesData).filter(([classId, data]) =>
+        !term || classId.toLowerCase().includes(term) || (data.className || "").toLowerCase().includes(term)
+    );
+    renderClassesTable(entries);
 }
 
 // Добавя новосъздаден/обновен клас директно в интерфейса, без да разбърква реда на таблицата
@@ -89,13 +142,7 @@ function upsertClassInUI(classId, className, students) {
     addOptionIfMissing(document.getElementById("assign-group-select"));
     addOptionIfMissing(document.getElementById("filter-assignments-class"));
 
-    const classesTable = document.getElementById("classes-table-body");
-    const existingRow = document.getElementById(`class-row-${classId}`);
-    if (existingRow) {
-        existingRow.outerHTML = renderClassRow(classId, className, students.length);
-    } else {
-        classesTable.insertAdjacentHTML("beforeend", renderClassRow(classId, className, students.length));
-    }
+    renderClassesTable(Object.entries(classesData));
 }
 
 // Зарежда данните за клас обратно във формата, за да могат да бъдат редактирани
@@ -125,8 +172,8 @@ function cancelClassEdit() {
     editingClassId = null;
     document.getElementById("create-class-form").reset();
     document.getElementById("class-id").readOnly = false;
-    document.getElementById("class-form-title").textContent = "Нов клас";
-    document.getElementById("class-form-submit-btn").textContent = "Запази Класа";
+    document.getElementById("class-form-title").textContent = "Добави нов клас";
+    document.getElementById("class-form-submit-btn").innerHTML = '<i class="fa-solid fa-plus"></i> Запази Класа';
     document.getElementById("class-form-cancel-btn").style.display = "none";
 }
 
@@ -142,7 +189,7 @@ async function deleteClass(classId) {
         }
 
         delete classesData[classId];
-        document.getElementById(`class-row-${classId}`)?.remove();
+        renderClassesTable(Object.entries(classesData));
         document.querySelectorAll(`#sidebar-class-select option[value="${classId}"], #filter-group option[value="${classId}"], #assign-group-select option[value="${classId}"], #filter-assignments-class option[value="${classId}"]`)
             .forEach(opt => opt.remove());
 
@@ -154,6 +201,9 @@ async function deleteClass(classId) {
     }
 }
 
+// Последно заредения (евентуално филтриран по клас) списък със задачи - използва се за локалното търсене
+let assignmentsCache = [];
+
 // Зареждане на задачите (винаги отразява актуално активните задачи за избрания филтър)
 async function loadAssignments(selectedClassFilter = "") {
     try {
@@ -164,9 +214,10 @@ async function loadAssignments(selectedClassFilter = "") {
 
         const res = await fetch(url);
         let assignments = await res.json();
+        assignmentsCache = assignments;
+        assignments.forEach(a => { assignmentTitleById[a.id] = a.title; });
 
         const filterAssignment = document.getElementById("filter-assignment");
-        const assignmentsTable = document.getElementById("assignments-table-body");
 
         // Табелата "Задача" в статистиката винаги отразява актуално активните задачи за текущия филтър
         const previouslySelected = filterAssignment.value;
@@ -178,17 +229,39 @@ async function loadAssignments(selectedClassFilter = "") {
             filterAssignment.value = previouslySelected;
         }
 
-        assignmentsTable.innerHTML = "";
-        assignments.forEach(a => {
-            assignmentsTable.insertAdjacentHTML("beforeend", renderAssignmentRow(a));
-        });
-
-        if (assignments.length === 0) {
-            assignmentsTable.innerHTML = `<tr><td colspan="4" style="text-align:center; color: var(--text-muted);">Няма намерени задачи.</td></tr>`;
-        }
+        const searchInput = document.getElementById("assignments-search");
+        if (searchInput) searchInput.value = "";
+        renderAssignmentsTable(assignments);
     } catch (err) {
         console.error("Грешка при зареждане на задачите:", err);
     }
+}
+
+// Рендва цялото тяло на таблицата със задачи от подаден списък
+function renderAssignmentsTable(list) {
+    const assignmentsTable = document.getElementById("assignments-table-body");
+    if (list.length === 0) {
+        assignmentsTable.innerHTML = `
+            <tr><td colspan="4">
+                <div class="empty-state">
+                    <div class="empty-icon"><i class="fa-solid fa-inbox"></i></div>
+                    <h4>Няма създадени задачи</h4>
+                    <p>Създайте първата задача, за да я видите тук.</p>
+                </div>
+            </td></tr>
+        `;
+        return;
+    }
+    assignmentsTable.innerHTML = list.map(renderAssignmentRow).join("");
+}
+
+// Претърсва локално кешираните задачи по заглавие или клас
+function filterAssignmentsBySearch() {
+    const term = document.getElementById("assignments-search").value.trim().toLowerCase();
+    const filtered = assignmentsCache.filter(a =>
+        !term || (a.title || "").toLowerCase().includes(term) || (a.group_id || a.class_id || "").toLowerCase().includes(term)
+    );
+    renderAssignmentsTable(filtered);
 }
 
 // Пътят на текущата страница (без файла), за да работи линкът и при хостване в подпапка (напр. GitHub Pages project site)
@@ -337,6 +410,51 @@ document.getElementById("create-assignment-form")?.addEventListener("submit", as
     }
 });
 
+// Плъзгане и пускане на файл с критерии в секция "Задачи"
+function setupCriteriaDropZone() {
+    const dropZone = document.getElementById("criteria-drop-zone");
+    const fileInput = document.getElementById("criteria-file-input");
+    if (!dropZone || !fileInput) return;
+
+    const showFileName = () => {
+        const display = document.getElementById("criteria-file-name-display");
+        display.textContent = fileInput.files.length > 0 ? `Избран файл: ${fileInput.files[0].name}` : "";
+    };
+
+    ['dragenter', 'dragover', 'dragleave', 'drop'].forEach(eventName => {
+        dropZone.addEventListener(eventName, (e) => { e.preventDefault(); e.stopPropagation(); });
+    });
+    ['dragenter', 'dragover'].forEach(eventName => {
+        dropZone.addEventListener(eventName, () => dropZone.classList.add('dragover'));
+    });
+    ['dragleave', 'drop'].forEach(eventName => {
+        dropZone.addEventListener(eventName, () => dropZone.classList.remove('dragover'));
+    });
+    dropZone.addEventListener('drop', (e) => {
+        const files = e.dataTransfer.files;
+        if (files.length > 0) {
+            fileInput.files = files;
+            showFileName();
+        }
+    });
+    fileInput.addEventListener('change', showFileName);
+}
+
+// Периодично опресняване на статистиката, докато секцията е отворена (за да се вижда веднага ново предаден материал)
+let dashboardPollInterval = null;
+
+function startDashboardPolling() {
+    stopDashboardPolling();
+    dashboardPollInterval = setInterval(loadDashboardData, 15000);
+}
+
+function stopDashboardPolling() {
+    if (dashboardPollInterval) {
+        clearInterval(dashboardPollInterval);
+        dashboardPollInterval = null;
+    }
+}
+
 // Синхронизиране на филтрите между лентата и таблото
 function syncClassFilter(val) {
     document.getElementById("filter-group").value = val;
@@ -387,12 +505,21 @@ async function loadDashboardData() {
         tbody.innerHTML = "";
 
         if (submissions.length === 0) {
-            tbody.innerHTML = `<tr><td colspan="6" style="text-align: center; color: var(--text-muted);">Няма намерени предадени решения за избраните филтри.</td></tr>`;
+            tbody.innerHTML = `
+                <tr><td colspan="7">
+                    <div class="empty-state">
+                        <div class="empty-icon"><i class="fa-solid fa-inbox"></i></div>
+                        <h4>Няма предадени решения</h4>
+                        <p>Няма намерени предадени решения за избраните филтри.</p>
+                    </div>
+                </td></tr>
+            `;
             return;
         }
 
         submissions.forEach((sub, index) => {
             const statusBadge = 'Проверено';
+            const taskTitle = assignmentTitleById[sub.assignment_id] || (sub.assignment_id ? sub.assignment_id : '—');
             const fileActions = (sub.file_url && sub.file_url !== '#')
                 ? `
                     <a href="${sub.file_url}" target="_blank" rel="noopener" class="btn-icon" title="Отвори в нов прозорец"><i class="fa-regular fa-eye"></i></a>
@@ -404,6 +531,7 @@ async function loadDashboardData() {
                 <tr>
                     <td>${index + 1}</td>
                     <td><strong>${sub.student_name || 'Неизвестен'}</strong></td>
+                    <td>${taskTitle}</td>
                     <td>${sub.filename || sub.file_name || 'Файл'}</td>
                     <td><strong>${sub.score || 0}</strong> / ${sub.max_score || 100} точки</td>
                     <td><span class="badge-status">${statusBadge}</span></td>

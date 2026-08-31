@@ -247,10 +247,12 @@ async def evaluate_file(
 
     percentage = round((result["score"] / result["max_score"] * 100), 1) if result["max_score"] > 0 else 0
 
+    # Забележка: таблицата submissions няма собствена колона assignment_id, затова
+    # го пазим вътре в details_json (вече съществуваща JSON колона), за да не се
+    # налага промяна на схемата на базата данни.
     submission_data = {
         "student_name": student_name,
         "class_id": class_id,
-        "assignment_id": assignment_id,
         "filename": file.filename,
         "file_url": file_url,
         "storage_path": storage_path,
@@ -259,23 +261,13 @@ async def evaluate_file(
         "score": result["score"],
         "max_score": result["max_score"],
         "percentage": percentage,
-        "details_json": result["details"]
+        "details_json": {"assignment_id": assignment_id, "details": result["details"]}
     }
-    
+
     try:
         supabase.table("submissions").insert(submission_data).execute()
     except Exception as e:
-        err_str = str(e)
-        if "assignment_id" in err_str and ("does not exist" in err_str or "Could not find" in err_str):
-            # Базата данни все още няма колона assignment_id - записваме без нея,
-            # за да не се губят предадените материали, докато схемата не бъде обновена.
-            fallback_data = {k: v for k, v in submission_data.items() if k != "assignment_id"}
-            try:
-                supabase.table("submissions").insert(fallback_data).execute()
-            except Exception as e2:
-                print(f"Грешка при запис на предаването (fallback): {e2}")
-        else:
-            print(f"Грешка при запис на предаването: {e}")
+        print(f"Грешка при запис на предаването: {e}")
 
     return {
         "student_name": student_name,
@@ -294,20 +286,17 @@ async def get_submissions(group_id: Optional[str] = None, assignment_id: Optiona
         query = supabase.table("submissions").select("*")
         if group_id:
             query = query.eq("class_id", group_id)
-        if assignment_id:
-            query = query.eq("assignment_id", assignment_id)
         res = query.execute()
-        return res.data or []
+        rows = res.data or []
+
+        # assignment_id се пази вътре в details_json - извличаме го тук за удобство
+        for row in rows:
+            details = row.get("details_json")
+            row["assignment_id"] = details.get("assignment_id") if isinstance(details, dict) else None
+
+        if assignment_id:
+            rows = [r for r in rows if r.get("assignment_id") == assignment_id]
+
+        return rows
     except Exception as e:
-        err_str = str(e)
-        if assignment_id and "assignment_id" in err_str and ("does not exist" in err_str or "Could not find" in err_str):
-            # Базата данни все още няма колона assignment_id - връщаме резултатите само по клас.
-            try:
-                query = supabase.table("submissions").select("*")
-                if group_id:
-                    query = query.eq("class_id", group_id)
-                res = query.execute()
-                return res.data or []
-            except Exception as e2:
-                raise HTTPException(status_code=500, detail=f"Грешка при четене: {str(e2)}")
-        raise HTTPException(status_code=500, detail=f"Грешка при четене: {err_str}")
+        raise HTTPException(status_code=500, detail=f"Грешка при четене: {str(e)}")

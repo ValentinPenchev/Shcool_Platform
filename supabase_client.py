@@ -1,4 +1,5 @@
 import os
+import re
 from datetime import datetime, timedelta
 from supabase import create_client, Client
 
@@ -14,6 +15,24 @@ BUCKET_NAME = "student-files"
 # Инициализиране на клиента
 supabase: Client = create_client(SUPABASE_URL, SUPABASE_KEY)
 
+# Supabase Storage не позволява кирилица (и други символи извън ASCII) в ключа на
+# обекта - заявката бива отхвърлена с InvalidKey дори при percent-encoding, защото
+# сървърът декодира и валидира ключа отново. Затова транслитерираме, преди да качим.
+_CYRILLIC_TO_LATIN = {
+    "а": "a", "б": "b", "в": "v", "г": "g", "д": "d", "е": "e", "ж": "zh", "з": "z",
+    "и": "i", "й": "y", "к": "k", "л": "l", "м": "m", "н": "n", "о": "o", "п": "p",
+    "р": "r", "с": "s", "т": "t", "у": "u", "ф": "f", "х": "h", "ц": "ts", "ч": "ch",
+    "ш": "sh", "щ": "sht", "ъ": "a", "ь": "y", "ю": "yu", "я": "ya",
+}
+_CYRILLIC_TO_LATIN.update({k.upper(): v.capitalize() for k, v in _CYRILLIC_TO_LATIN.items()})
+
+
+def sanitize_storage_segment(text: str) -> str:
+    """Транслитерира кирилица на латиница и премахва символи, невалидни за Storage ключ."""
+    transliterated = "".join(_CYRILLIC_TO_LATIN.get(ch, ch) for ch in text)
+    safe = re.sub(r"[^A-Za-z0-9._-]+", "_", transliterated).strip("_")
+    return safe or "file"
+
 
 def upload_to_supabase(file_bytes: bytes, filename: str, path_in_bucket: str) -> str:
     """
@@ -26,17 +45,13 @@ def upload_to_supabase(file_bytes: bytes, filename: str, path_in_bucket: str) ->
             file=file_bytes,
             file_options={"content-type": "application/octet-stream", "upsert": "true"}
         )
-        
+
         # Генериране на публичен URL
         public_url = supabase.storage.from_(BUCKET_NAME).get_public_url(path_in_bucket)
         return public_url
     except Exception as e:
         print(f"Грешка при качване в Supabase Storage: {e}")
-        # Ако файлът вече съществува, опитваме да вземем линка директно
-        try:
-            return supabase.storage.from_(BUCKET_NAME).get_public_url(path_in_bucket)
-        except:
-            raise e
+        raise
 
 
 def cleanup_expired_files(days: int = 60):

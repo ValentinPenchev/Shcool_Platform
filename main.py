@@ -9,7 +9,7 @@ from fastapi.middleware.cors import CORSMiddleware
 import pandas as pd
 import docx
 
-from supabase_client import supabase, upload_to_supabase, cleanup_expired_files
+from supabase_client import supabase, upload_to_supabase, cleanup_expired_files, sanitize_storage_segment
 from evaluators.word_eval import evaluate_word
 from evaluators.excel_eval import evaluate_excel
 from evaluators.ppt_eval import evaluate_ppt
@@ -223,7 +223,7 @@ async def evaluate_file(
     meta = extract_office_metadata(contents)
     creation_time = meta.get("created")
 
-    storage_path = f"{class_id}/{student_name.replace(' ', '_')}_{file.filename}"
+    storage_path = f"{sanitize_storage_segment(class_id)}/{sanitize_storage_segment(student_name)}_{sanitize_storage_segment(file.filename)}"
 
     try:
         file_url = upload_to_supabase(contents, file.filename, storage_path)

@@ -39,13 +39,10 @@ async function loadClasses() {
         const res = await fetch(`${API_URL}/admin/groups`);
         const classes = await res.json();
 
-        const sidebarSelect = document.getElementById("sidebar-class-select");
         const filterGroup = document.getElementById("filter-group");
         const assignGroupSelect = document.getElementById("assign-group-select");
-        const classesTable = document.getElementById("classes-table-body");
         const filterAssignmentsClass = document.getElementById("filter-assignments-class");
 
-        sidebarSelect.innerHTML = "";
         filterGroup.innerHTML = '<option value="">Всички класове</option>';
         assignGroupSelect.innerHTML = "";
         if(filterAssignmentsClass) filterAssignmentsClass.innerHTML = '<option value="">Всички класове</option>';
@@ -56,7 +53,6 @@ async function loadClasses() {
             const classStudents = c.students_json || c.students || [];
             classesData[classId] = { className, students: classStudents };
 
-            sidebarSelect.innerHTML += `<option value="${classId}">${className}</option>`;
             filterGroup.innerHTML += `<option value="${classId}">${className}</option>`;
             assignGroupSelect.innerHTML += `<option value="${classId}">${className}</option>`;
             if(filterAssignmentsClass) filterAssignmentsClass.innerHTML += `<option value="${classId}">${className}</option>`;
@@ -93,10 +89,10 @@ function classBadgeColorIndex(index) {
     return `c${index % 5}`;
 }
 
-// Маркъп на един ред в таблицата с класове
+// Маркъп на един ред в таблицата с класове (кликването върху реда отваря резултатите на класа в Статистика)
 function renderClassRow(classId, className, studentsCount, colorIndex = 0) {
     return `
-        <tr id="class-row-${classId}">
+        <tr id="class-row-${classId}" class="clickable-row" onclick="viewClassResults('${classId}')" title="Отвори резултатите за този клас">
             <td>
                 <div class="class-name-cell">
                     <span class="class-badge ${classBadgeColorIndex(colorIndex)}">${(className || classId).slice(0, 2)}</span>
@@ -106,11 +102,17 @@ function renderClassRow(classId, className, studentsCount, colorIndex = 0) {
             <td>${classId}</td>
             <td><i class="fa-solid fa-user-group" style="color: var(--text-muted); margin-right: 6px;"></i>${studentsCount} ученици</td>
             <td>
-                <button type="button" class="btn-icon" onclick="editClass('${classId}')" title="Редактирай класа"><i class="fa-regular fa-pen-to-square"></i></button>
-                <button type="button" class="btn-danger-icon" onclick="deleteClass('${classId}')" title="Изтрий класа"><i class="fa-regular fa-trash-can"></i></button>
+                <button type="button" class="btn-icon" onclick="event.stopPropagation(); editClass('${classId}')" title="Редактирай класа"><i class="fa-regular fa-pen-to-square"></i></button>
+                <button type="button" class="btn-danger-icon" onclick="event.stopPropagation(); deleteClass('${classId}')" title="Изтрий класа"><i class="fa-regular fa-trash-can"></i></button>
             </td>
         </tr>
     `;
+}
+
+// Отваря Статистика, филтрирана само за резултатите/материалите на избрания клас
+function viewClassResults(classId) {
+    syncClassFilter(classId);
+    showSection('dashboard');
 }
 
 // Претърсва локално кешираните класове по име или ID
@@ -137,7 +139,6 @@ function upsertClassInUI(classId, className, students) {
         }
     };
 
-    addOptionIfMissing(document.getElementById("sidebar-class-select"));
     addOptionIfMissing(document.getElementById("filter-group"));
     addOptionIfMissing(document.getElementById("assign-group-select"));
     addOptionIfMissing(document.getElementById("filter-assignments-class"));
@@ -190,7 +191,7 @@ async function deleteClass(classId) {
 
         delete classesData[classId];
         renderClassesTable(Object.entries(classesData));
-        document.querySelectorAll(`#sidebar-class-select option[value="${classId}"], #filter-group option[value="${classId}"], #assign-group-select option[value="${classId}"], #filter-assignments-class option[value="${classId}"]`)
+        document.querySelectorAll(`#filter-group option[value="${classId}"], #assign-group-select option[value="${classId}"], #filter-assignments-class option[value="${classId}"]`)
             .forEach(opt => opt.remove());
 
         if (editingClassId === classId) cancelClassEdit();
@@ -553,7 +554,7 @@ function renderSubmissionsTable() {
 
     if (filtered.length === 0) {
         tbody.innerHTML = `
-            <tr><td colspan="7">
+            <tr><td colspan="8">
                 <div class="empty-state">
                     <div class="empty-icon"><i class="fa-solid fa-inbox"></i></div>
                     <h4>Няма предадени решения</h4>
@@ -575,6 +576,7 @@ function renderSubmissionsTable() {
         const statusBadge = '<i class="fa-solid fa-check"></i> Проверено';
         const taskTitle = assignmentTitleById[sub.assignment_id] || (sub.assignment_id ? sub.assignment_id : '—');
         const studentName = sub.student_name || 'Неизвестен';
+        const submittedAt = formatSubmittedAt(sub.created_at);
         const fileActions = (sub.file_url && sub.file_url !== '#')
             ? `
                 <a href="${sub.file_url}" target="_blank" rel="noopener" class="btn-icon" title="Отвори в нов прозорец"><i class="fa-regular fa-eye"></i></a>
@@ -588,14 +590,42 @@ function renderSubmissionsTable() {
                 <td><span class="row-avatar a${index % 5}">${studentName.slice(0, 1).toUpperCase()}</span><strong>${studentName}</strong></td>
                 <td>${taskTitle}</td>
                 <td><div class="file-name-cell"><i class="fa-regular fa-file-lines"></i>${sub.filename || sub.file_name || 'Файл'}</div></td>
+                <td>${submittedAt}</td>
                 <td><strong>${sub.score || 0}</strong> / ${sub.max_score || 100} точки</td>
                 <td><span class="badge-status">${statusBadge}</span></td>
-                <td>${fileActions}</td>
+                <td>${fileActions}<button type="button" class="btn-danger-icon" onclick="deleteSubmission(${sub.id})" title="Изтрий предаването"><i class="fa-regular fa-trash-can"></i></button></td>
             </tr>
         `;
     }).join("");
 
     renderSubmissionsPagination(filtered.length);
+}
+
+// Форматира датата на предаване като дд/мм/гггг чч:мм
+function formatSubmittedAt(dateStr) {
+    if (!dateStr) return '—';
+    const d = new Date(dateStr);
+    if (isNaN(d.getTime())) return '—';
+    const pad = (n) => String(n).padStart(2, '0');
+    return `${pad(d.getDate())}.${pad(d.getMonth() + 1)}.${d.getFullYear()} ${pad(d.getHours())}:${pad(d.getMinutes())}`;
+}
+
+// Ръчно изтриване на предадено решение (материал + запис в базата)
+async function deleteSubmission(submissionId) {
+    if (!confirm("Сигурни ли сте, че искате да изтриете това предадено решение? Файлът също ще бъде премахнат.")) return;
+
+    try {
+        const response = await fetch(`${API_URL}/admin/submissions/${submissionId}`, { method: "DELETE" });
+        if (!response.ok) {
+            const errData = await response.json().catch(() => ({}));
+            throw new Error(errData.detail || `HTTP грешка: ${response.status}`);
+        }
+
+        submissionsCache = submissionsCache.filter(sub => sub.id !== submissionId);
+        renderSubmissionsTable();
+    } catch (err) {
+        alert("Грешка при изтриване на предаването: " + err.message);
+    }
 }
 
 function renderSubmissionsPagination(totalCount) {
@@ -651,7 +681,7 @@ function exportSubmissionsCSV() {
         return;
     }
 
-    const headers = ["Ученик", "Задача", "Клас", "Файл", "Точки", "Максимум точки", "Успех (%)"];
+    const headers = ["Ученик", "Задача", "Клас", "Файл", "Предадено на", "Точки", "Максимум точки", "Успех (%)"];
     const csvRows = [headers.join(",")];
     rows.forEach(sub => {
         const taskTitle = assignmentTitleById[sub.assignment_id] || sub.assignment_id || "";
@@ -660,6 +690,7 @@ function exportSubmissionsCSV() {
             taskTitle,
             sub.class_id || "",
             sub.filename || "",
+            formatSubmittedAt(sub.created_at),
             sub.score || 0,
             sub.max_score || 0,
             sub.percentage || 0

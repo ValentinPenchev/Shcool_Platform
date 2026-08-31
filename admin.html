@@ -22,18 +22,6 @@
                 <li id="menu-assignments"><a href="#" onclick="showSection('assignments')"><i class="fa-regular fa-clipboard"></i> Задачи</a></li>
                 <li id="menu-classes"><a href="#" onclick="showSection('classes')"><i class="fa-solid fa-user-group"></i> Ученици</a></li>
             </ul>
-
-            <div class="sidebar-footer">
-                <div class="class-selector-card">
-                    <i class="fa-solid fa-graduation-cap"></i>
-                    <div>
-                        <span class="label">Избран клас</span>
-                        <select id="sidebar-class-select" onchange="syncClassFilter(this.value)">
-                            <!-- Динамично попълване -->
-                        </select>
-                    </div>
-                </div>
-            </div>
         </aside>
 
         <!-- ОСНОВНО СЪДЪРЖАНИЕ -->
@@ -45,7 +33,7 @@
                         <h1>Статистика за предадените задачи</h1>
                         <p class="subtitle" style="margin-bottom:0;">Проследете напредъка на учениците и резултатите от автоматичната проверка.</p>
                     </div>
-                    <button type="button" class="btn-secondary" style="margin-top:0; margin-left:0;" onclick="exportSubmissionsCSV()"><i class="fa-solid fa-download"></i> Експорт на данни</button>
+                    <button type="button" class="btn-secondary" onclick="exportSubmissionsCSV()"><i class="fa-solid fa-download"></i> Експорт на данни</button>
                 </div>
 
                 <div class="filters-row">
@@ -122,6 +110,7 @@
                                     <th>Ученик</th>
                                     <th>Задача</th>
                                     <th>Файл</th>
+                                    <th>Предадено на</th>
                                     <th>Точки / Успех</th>
                                     <th>Статус</th>
                                     <th>Материал</th>
@@ -248,8 +237,10 @@
                                 <textarea id="class-names-text" class="custom-textarea" rows="4" placeholder="Иван Иванов&#10;Мария Петрова&#10;..."></textarea>
                             </div>
                         </div>
-                        <button type="submit" class="btn-primary" id="class-form-submit-btn"><i class="fa-solid fa-plus"></i> Запази Класа</button>
-                        <button type="button" class="btn-secondary" id="class-form-cancel-btn" onclick="cancelClassEdit()" style="display:none;">Отказ</button>
+                        <div class="form-actions">
+                            <button type="submit" class="btn-primary" id="class-form-submit-btn"><i class="fa-solid fa-plus"></i> Запази Класа</button>
+                            <button type="button" class="btn-secondary" id="class-form-cancel-btn" onclick="cancelClassEdit()" style="display:none;">Отказ</button>
+                        </div>
                     </form>
                 </div>
 

@@ -6,14 +6,20 @@ from supabase import create_client, Client
 # Базов адрес на проекта
 SUPABASE_URL = "https://rtxicehpuddssvicmiwf.supabase.co"
 
-# API ключ
-SUPABASE_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InJ0eGljZWhwdWRkc3N2aWNtaXdmIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODgwNTc5NDksImV4cCI6MjEwMzYzMzk0OX0.NIY9thV8j7tC9K-oN2P2LIDKKGXf9xSoutYTNVmjz0A"
+# Anon ключ - позволява качване и публично четене, но storage RLS политиките му
+# забраняват изтриване (remove() minaва без грешка, но файлът реално не се трие)
+SUPABASE_ANON_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InJ0eGljZWhwdWRkc3N2aWNtaXdmIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODgwNTc5NDksImV4cCI6MjEwMzYzMzk0OX0.NIY9thV8j7tC9K-oN2P2LIDKKGXf9xSoutYTNVmjz0A"
+
+# Service role ключ (Supabase Dashboard -> Project Settings -> API -> service_role) -
+# заобикаля RLS и е нужен, за да работи реалното изтриване на файлове от Storage.
+# Задава се като environment variable SUPABASE_SERVICE_KEY (напр. в Render), никога в кода.
+SUPABASE_SERVICE_KEY = os.environ.get("SUPABASE_SERVICE_KEY")
 
 # Име на Public Bucket-а в Supabase Storage
 BUCKET_NAME = "student-files"
 
-# Инициализиране на клиента
-supabase: Client = create_client(SUPABASE_URL, SUPABASE_KEY)
+# Инициализиране на клиента - ползва service role ключа, ако е наличен, иначе anon ключа
+supabase: Client = create_client(SUPABASE_URL, SUPABASE_SERVICE_KEY or SUPABASE_ANON_KEY)
 
 # Supabase Storage не позволява кирилица (и други символи извън ASCII) в ключа на
 # обекта - заявката бива отхвърлена с InvalidKey дори при percent-encoding, защото

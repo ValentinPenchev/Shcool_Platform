@@ -9,7 +9,7 @@ from fastapi.middleware.cors import CORSMiddleware
 import pandas as pd
 import docx
 
-from supabase_client import supabase, upload_to_supabase, cleanup_expired_files, sanitize_storage_segment
+from supabase_client import supabase, upload_to_supabase, cleanup_expired_files, sanitize_storage_segment, BUCKET_NAME
 from evaluators.word_eval import evaluate_word
 from evaluators.excel_eval import evaluate_excel
 from evaluators.ppt_eval import evaluate_ppt
@@ -300,3 +300,18 @@ async def get_submissions(group_id: Optional[str] = None, assignment_id: Optiona
         return rows
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Грешка при четене: {str(e)}")
+
+@app.delete("/api/admin/submissions/{submission_id}")
+async def delete_submission(submission_id: int):
+    try:
+        res = supabase.table("submissions").select("storage_path").eq("id", submission_id).execute()
+        if res.data and res.data[0].get("storage_path"):
+            try:
+                supabase.storage.from_(BUCKET_NAME).remove([res.data[0]["storage_path"]])
+            except Exception as e:
+                print(f"Забележка при изтриване на файла от Storage: {e}")
+
+        supabase.table("submissions").delete().eq("id", submission_id).execute()
+        return {"status": "success", "message": f"Предаването {submission_id} е изтрито."}
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Грешка при изтриване: {str(e)}")

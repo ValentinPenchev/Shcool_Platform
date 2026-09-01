@@ -14,6 +14,7 @@ from evaluators.word_eval import evaluate_word
 from evaluators.excel_eval import evaluate_excel
 from evaluators.ppt_eval import evaluate_ppt
 from evaluators.metadata import extract_office_metadata
+from evaluators.criteria_parser import extract_criteria_from_text
 
 app = FastAPI(title="Office & Code Evaluator API")
 
@@ -145,11 +146,11 @@ async def create_assignment(
             content = await criteria_file.read()
             doc = docx.Document(io.BytesIO(content))
             extracted_texts = [p.text.strip() for p in doc.paragraphs if p.text.strip()]
-            
-            criteria_parsed = {
-                f"criterion_{i+1}": {"description": text, "points": 1, "enabled": True}
-                for i, text in enumerate(extracted_texts)
-            }
+
+            # Абзаците се разпознават по ключови думи (напр. "таблица", "изображение",
+            # "формула") и се превръщат в ключовете, които evaluator-ите реално четат -
+            # генеричните "criterion_N" по-рано не участваха в оценяването изобщо.
+            criteria_parsed = extract_criteria_from_text(extracted_texts)
         except Exception as e:
             raise HTTPException(status_code=400, detail=f"Грешка при четене на Word файла: {str(e)}")
     elif criteria_json and criteria_json.strip():

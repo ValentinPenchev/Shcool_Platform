@@ -55,7 +55,38 @@ function toggleTheme() {
     applyTheme(saved);
 })();
 
-document.addEventListener("DOMContentLoaded", async () => {
+// -----------------------------------------------------------------------------
+// ВХОД С ПАРОЛА - всички /api/admin/* заявки изискват хедъра X-Admin-Password,
+// проверен от бекенда. Паролата се пази локално (localStorage), за да не се
+// въвежда всеки път; при грешна/оттеглена парола adminFetch връща 401 и
+// автоматично връща обратно към екрана за вход.
+// -----------------------------------------------------------------------------
+const ADMIN_PASSWORD_STORAGE_KEY = "vpclassroom-admin-password";
+let adminPassword = null;
+
+// Всички заявки към /api/admin/* трябва да минават през тази функция, а не през
+// голия fetch() - добавя паролата и автоматично разлогва при 401 отговор
+async function adminFetch(url, options = {}) {
+    const headers = new Headers(options.headers || {});
+    headers.set("X-Admin-Password", adminPassword || "");
+    const response = await fetch(url, { ...options, headers });
+    if (response.status === 401) {
+        try { localStorage.removeItem(ADMIN_PASSWORD_STORAGE_KEY); } catch (err) {}
+        adminPassword = null;
+        document.getElementById("login-overlay").style.display = "flex";
+        document.getElementById("app-layout").hidden = true;
+        showToast("Сесията е изтекла. Въведете паролата отново.", "warning");
+    }
+    return response;
+}
+
+function enterApp() {
+    document.getElementById("login-overlay").style.display = "none";
+    document.getElementById("app-layout").hidden = false;
+    initializeAdminApp();
+}
+
+async function initializeAdminApp() {
     // Изчакваме класовете и задачите, за да са налични имената им (напр. в колоната "Задача"),
     // преди първото зареждане на статистиката
     await Promise.all([loadClasses(), loadAssignments()]);
@@ -63,6 +94,45 @@ document.addEventListener("DOMContentLoaded", async () => {
     startDashboardPolling();
     setupCriteriaDropZone();
     loadTemplates();
+}
+
+function adminLogout() {
+    try { localStorage.removeItem(ADMIN_PASSWORD_STORAGE_KEY); } catch (err) {}
+    location.reload();
+}
+
+document.getElementById("login-form")?.addEventListener("submit", async (e) => {
+    e.preventDefault();
+    const pwd = document.getElementById("login-password").value;
+    const errorEl = document.getElementById("login-error");
+    errorEl.style.display = "none";
+
+    try {
+        const res = await fetch(`${API_URL}/admin/groups`, { headers: { "X-Admin-Password": pwd } });
+        if (!res.ok) throw new Error("Грешна парола");
+        adminPassword = pwd;
+        try { localStorage.setItem(ADMIN_PASSWORD_STORAGE_KEY, pwd); } catch (err) {}
+        enterApp();
+    } catch (err) {
+        errorEl.style.display = "block";
+    }
+});
+
+document.addEventListener("DOMContentLoaded", async () => {
+    let saved = null;
+    try { saved = localStorage.getItem(ADMIN_PASSWORD_STORAGE_KEY); } catch (err) {}
+
+    if (!saved) return; // остава на екрана за вход (той е видим по подразбиране)
+
+    adminPassword = saved;
+    try {
+        const res = await fetch(`${API_URL}/admin/groups`, { headers: { "X-Admin-Password": saved } });
+        if (!res.ok) throw new Error("Невалидна запазена парола");
+        enterApp();
+    } catch (err) {
+        try { localStorage.removeItem(ADMIN_PASSWORD_STORAGE_KEY); } catch (e) {}
+        adminPassword = null;
+    }
 });
 
 // Шаблони за задачи - зарежда ги в падащото меню и в списъка за управление
@@ -70,7 +140,7 @@ let templatesCache = [];
 
 async function loadTemplates() {
     try {
-        const res = await fetch(`${API_URL}/admin/templates`);
+        const res = await adminFetch(`${API_URL}/admin/templates`);
         if (!res.ok) throw new Error("Грешка при заявката към сървъра");
         templatesCache = await res.json();
 
@@ -108,7 +178,7 @@ function renderTemplatesList() {
 async function deleteTemplate(templateId) {
     if (!confirm("Сигурни ли сте, че искате да изтриете този шаблон?")) return;
     try {
-        const response = await fetch(`${API_URL}/admin/templates/${templateId}`, { method: "DELETE" });
+        const response = await adminFetch(`${API_URL}/admin/templates/${templateId}`, { method: "DELETE" });
         if (!response.ok) throw new Error("Грешка при изтриване от сървъра");
         showToast("Шаблонът е изтрит.", "success");
         await loadTemplates();
@@ -153,7 +223,7 @@ const assignmentTitleById = {};
 // Зареждане на класовете от базата данни
 async function loadClasses() {
     try {
-        const res = await fetch(`${API_URL}/admin/groups`);
+        const res = await adminFetch(`${API_URL}/admin/groups`);
         const classes = await res.json();
 
         const filterGroup = document.getElementById("filter-group");
@@ -377,7 +447,7 @@ async function saveClassRoster(classId, className, students, inactiveStudents) {
         formData.append("inactive_students_json", JSON.stringify(inactiveStudents));
     }
 
-    const response = await fetch(`${API_URL}/admin/groups`, { method: "POST", body: formData });
+    const response = await adminFetch(`${API_URL}/admin/groups`, { method: "POST", body: formData });
     if (!response.ok) {
         const errData = await response.json().catch(() => ({}));
         throw new Error(errData.detail || `HTTP грешка: ${response.status}`);
@@ -524,12 +594,51 @@ function cancelClassEdit() {
     document.getElementById("class-form-cancel-btn").style.display = "none";
 }
 
+// Зарежда данните на съществуваща задача обратно във формата за редакция (краен
+// срок, линк) - критериите и помощният файл остават непроменени на сървъра, ако
+// тук не се избере нов файл/шаблон, вместо тихо да се изтрият при запис
+let editingAssignmentId = null;
+
+function isoToDatetimeLocalValue(isoString) {
+    const d = new Date(isoString);
+    if (isNaN(d.getTime())) return "";
+    const pad = (n) => String(n).padStart(2, '0');
+    return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}`;
+}
+
+function editAssignment(assignmentId) {
+    const data = assignmentsCache.find(a => a.id === assignmentId);
+    if (!data) return;
+
+    editingAssignmentId = assignmentId;
+
+    document.getElementById("assign-group-select").value = data.group_id || data.class_id || "";
+    document.getElementById("assign-title").value = data.title || "";
+    document.getElementById("assign-deadline").value = data.deadline ? isoToDatetimeLocalValue(data.deadline) : "";
+    document.getElementById("assign-reference-link").value = data.reference_link || "";
+
+    document.getElementById("assignment-form-title").textContent = `Редактиране на задача: ${data.title}`;
+    document.getElementById("assignment-form-submit-btn").innerHTML = '<i class="fa-solid fa-check"></i> Запази промените';
+    document.getElementById("assignment-form-cancel-btn").style.display = "inline-block";
+
+    document.getElementById("assign-group-select").scrollIntoView({ behavior: "smooth", block: "center" });
+}
+
+function cancelAssignmentEdit() {
+    editingAssignmentId = null;
+    document.getElementById("create-assignment-form").reset();
+    document.getElementById("assign-template-title").style.display = "none";
+    document.getElementById("assignment-form-title").textContent = "Създай Задача";
+    document.getElementById("assignment-form-submit-btn").innerHTML = '<i class="fa-solid fa-plus"></i> Създай Задача';
+    document.getElementById("assignment-form-cancel-btn").style.display = "none";
+}
+
 // Изтриване на клас
 async function deleteClass(classId) {
     if (!confirm(`Сигурни ли сте, че искате да изтриете класа "${classId}"? Това действие не може да бъде отменено.`)) return;
 
     try {
-        const response = await fetch(`${API_URL}/admin/groups/${encodeURIComponent(classId)}`, { method: "DELETE" });
+        const response = await adminFetch(`${API_URL}/admin/groups/${encodeURIComponent(classId)}`, { method: "DELETE" });
         if (!response.ok) {
             const errData = await response.json().catch(() => ({}));
             throw new Error(errData.detail || `HTTP грешка: ${response.status}`);
@@ -560,7 +669,7 @@ async function loadAssignments(selectedClassFilter = "") {
             url += `?group_id=${encodeURIComponent(selectedClassFilter)}`;
         }
 
-        const res = await fetch(url);
+        const res = await adminFetch(url);
         let assignments = await res.json();
         assignmentsCache = assignments;
         assignments.forEach(a => { assignmentTitleById[a.id] = a.title; });
@@ -639,6 +748,7 @@ function renderAssignmentRow(a) {
             <td><a href="${studentUrl}" target="_blank" class="task-link">${studentUrl}</a></td>
             <td>
                 <button type="button" class="btn-icon" onclick="copyAssignmentLink('${a.id}')" title="Копирай линка"><i class="fa-regular fa-copy"></i></button>
+                <button type="button" class="btn-icon" onclick="editAssignment('${a.id}')" title="Редактирай задачата"><i class="fa-regular fa-pen-to-square"></i></button>
                 <button type="button" class="btn-danger-icon" onclick="deleteAssignment('${a.id}')" title="Изтрий задачата"><i class="fa-regular fa-trash-can"></i></button>
             </td>
         </tr>
@@ -658,7 +768,7 @@ async function deleteAssignment(assignmentId) {
     if (!confirm("Сигурни ли сте, че искате да изтриете тази задача? Това действие не може да бъде отменено.")) return;
 
     try {
-        const response = await fetch(`${API_URL}/admin/assignments/${encodeURIComponent(assignmentId)}`, { method: "DELETE" });
+        const response = await adminFetch(`${API_URL}/admin/assignments/${encodeURIComponent(assignmentId)}`, { method: "DELETE" });
         if (!response.ok) throw new Error("Грешка при изтриване от сървъра");
 
         document.getElementById(`assignment-row-${assignmentId}`)?.remove();
@@ -711,7 +821,7 @@ document.getElementById("create-class-form")?.addEventListener("submit", async (
     formData.append("students_json", JSON.stringify(studentsArray));
 
     try {
-        const response = await fetch(`${API_URL}/admin/groups`, {
+        const response = await adminFetch(`${API_URL}/admin/groups`, {
             method: "POST",
             body: formData
         });
@@ -767,9 +877,10 @@ document.getElementById("create-assignment-form")?.addEventListener("submit", as
     if (deadline) formData.append("deadline", deadline);
     if (referenceLink) formData.append("reference_link", referenceLink);
     if (referenceFileInput.files.length > 0) formData.append("reference_file", referenceFileInput.files[0]);
+    if (editingAssignmentId) formData.append("assignment_id", editingAssignmentId);
 
     try {
-        const response = await fetch(`${API_URL}/admin/assignments`, {
+        const response = await adminFetch(`${API_URL}/admin/assignments`, {
             method: "POST",
             body: formData
         });
@@ -801,16 +912,20 @@ document.getElementById("create-assignment-form")?.addEventListener("submit", as
                 const templateForm = new FormData();
                 templateForm.append("title", templateTitle);
                 templateForm.append("criteria_json", JSON.stringify(createdAssignment.criteria || {}));
-                await fetch(`${API_URL}/admin/templates`, { method: "POST", body: templateForm });
+                await adminFetch(`${API_URL}/admin/templates`, { method: "POST", body: templateForm });
                 await loadTemplates();
             } catch (tplErr) {
                 console.error("Грешка при запазване на шаблона:", tplErr);
             }
         }
 
-        showToast("Задачата е създадена успешно!", "success");
-        document.getElementById("create-assignment-form").reset();
-        document.getElementById("assign-template-title").style.display = "none";
+        showToast(editingAssignmentId ? "Задачата е обновена успешно!" : "Задачата е създадена успешно!", "success");
+        if (editingAssignmentId) {
+            cancelAssignmentEdit();
+        } else {
+            document.getElementById("create-assignment-form").reset();
+            document.getElementById("assign-template-title").style.display = "none";
+        }
 
         const currentFilter = document.getElementById("filter-assignments-class").value;
         await loadAssignments(currentFilter);
@@ -894,7 +1009,7 @@ async function loadDashboardData() {
         if (classId) params.push(`group_id=${encodeURIComponent(classId)}`);
         if (params.length > 0) url += `?${params.join('&')}`;
 
-        const res = await fetch(url);
+        const res = await adminFetch(url);
         if (!res.ok) throw new Error("Грешка при заявката към сървъра");
         const submissions = await res.json();
         // Най-новите предавания най-отгоре
@@ -927,9 +1042,50 @@ async function loadDashboardData() {
         if (searchInput) searchInput.value = "";
         submissionsCurrentPage = 1;
         renderSubmissionsTable();
+        renderCriteriaBreakdown();
     } catch (err) {
         console.error("Грешка при зареждане на таблото:", err);
     }
+}
+
+// Агрегира кои критерии най-често не са изпълнени сред текущо филтрираните предавания -
+// помага бързо да се види какво трябва да се преговори с класа
+function renderCriteriaBreakdown() {
+    const card = document.getElementById("criteria-breakdown-card");
+    const container = document.getElementById("criteria-breakdown-list");
+    if (!card || !container) return;
+
+    const failureCounts = {};
+    let submissionsWithDetails = 0;
+
+    submissionsCache.forEach(sub => {
+        const details = sub.details_json && Array.isArray(sub.details_json.details) ? sub.details_json.details : null;
+        if (!details) return;
+        submissionsWithDetails++;
+        details.forEach(d => {
+            if (d.passed) return;
+            const label = d.criterion || "Критерий";
+            failureCounts[label] = (failureCounts[label] || 0) + 1;
+        });
+    });
+
+    if (submissionsWithDetails === 0 || Object.keys(failureCounts).length === 0) {
+        card.style.display = "none";
+        return;
+    }
+
+    const entries = Object.entries(failureCounts).sort((a, b) => b[1] - a[1]).slice(0, 8);
+    const maxCount = entries[0][1];
+
+    container.innerHTML = entries.map(([label, count]) => `
+        <div class="criteria-bar-row">
+            <span class="criteria-bar-label">${label}</span>
+            <div class="progress-bar-track criteria-bar-track"><div class="progress-bar-fill" style="width:${Math.round((count / maxCount) * 100)}%"></div></div>
+            <span class="criteria-bar-count">${count} / ${submissionsWithDetails}</span>
+        </div>
+    `).join("");
+
+    card.style.display = "block";
 }
 
 // Обновява кръглия прогрес пръстен за средния успех
@@ -1070,7 +1226,7 @@ async function deleteSubmission(submissionId) {
     if (!confirm("Сигурни ли сте, че искате да изтриете това предадено решение? Файлът също ще бъде премахнат.")) return;
 
     try {
-        const response = await fetch(`${API_URL}/admin/submissions/${submissionId}`, { method: "DELETE" });
+        const response = await adminFetch(`${API_URL}/admin/submissions/${submissionId}`, { method: "DELETE" });
         if (!response.ok) {
             const errData = await response.json().catch(() => ({}));
             throw new Error(errData.detail || `HTTP грешка: ${response.status}`);
@@ -1254,7 +1410,7 @@ async function loadExercisesData() {
     // за да не изчезват вече записани качвания само защото по-новата справка за
     // оценки временно не отговаря (напр. по време на бавен деплой на бекенда).
     try {
-        const uploadsRes = await fetch(`${API_URL}/admin/exercises?group_id=${encodeURIComponent(classId)}`);
+        const uploadsRes = await adminFetch(`${API_URL}/admin/exercises?group_id=${encodeURIComponent(classId)}`);
         if (!uploadsRes.ok) throw new Error("Грешка при заявката към сървъра");
         exercisesCache = await uploadsRes.json();
     } catch (err) {
@@ -1272,7 +1428,7 @@ async function loadExercisesData() {
     }
 
     try {
-        const gradesRes = await fetch(`${API_URL}/admin/exercise-grades?group_id=${encodeURIComponent(classId)}`);
+        const gradesRes = await adminFetch(`${API_URL}/admin/exercise-grades?group_id=${encodeURIComponent(classId)}`);
         exerciseGradesCache = gradesRes.ok ? await gradesRes.json() : [];
     } catch (err) {
         console.error("Грешка при зареждане на въведените оценки:", err);
@@ -1411,7 +1567,7 @@ async function deleteExerciseUpload(uploadId, classId) {
     if (!confirm("Сигурни ли сте, че искате да изтриете това качване? Файлът също ще бъде премахнат.")) return;
 
     try {
-        const response = await fetch(`${API_URL}/admin/exercises/${uploadId}`, { method: "DELETE" });
+        const response = await adminFetch(`${API_URL}/admin/exercises/${uploadId}`, { method: "DELETE" });
         if (!response.ok) {
             const errData = await response.json().catch(() => ({}));
             throw new Error(errData.detail || `HTTP грешка: ${response.status}`);
@@ -1467,7 +1623,7 @@ async function markExerciseGraded(classId, studentName) {
         formData.append("class_id", classId);
         formData.append("student_name", studentName);
 
-        const response = await fetch(`${API_URL}/admin/exercises/mark-graded`, {
+        const response = await adminFetch(`${API_URL}/admin/exercises/mark-graded`, {
             method: "POST",
             body: formData
         });

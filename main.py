@@ -1,12 +1,15 @@
 import io
+import os
 import json
+import time
 import hashlib
 import uuid
 import asyncio
 from datetime import datetime
 from typing import Optional
-from fastapi import FastAPI, UploadFile, File, Form, HTTPException
+from fastapi import FastAPI, UploadFile, File, Form, HTTPException, Request
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.responses import JSONResponse
 import pandas as pd
 import docx
 
@@ -26,6 +29,36 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
+
+# Парола за админ панела - подадена от клиента в хедъра X-Admin-Password. Пази се
+# като environment variable в Render (може да се смени без промяна на кода), с fallback
+# към стойността по подразбиране. Пазят се само маршрутите под /api/admin/* - линковете
+# за ученици (задачи/качвания) остават публични и без парола.
+ADMIN_PASSWORD = os.environ.get("ADMIN_PASSWORD", "972700")
+
+@app.middleware("http")
+async def admin_auth_middleware(request: Request, call_next):
+    if request.method != "OPTIONS" and request.url.path.startswith("/api/admin"):
+        provided = request.headers.get("x-admin-password")
+        if provided != ADMIN_PASSWORD:
+            return JSONResponse(status_code=401, content={"detail": "Невалидна или липсваща парола за достъп."})
+    return await call_next(request)
+
+# Много прост in-memory rate limit за публичните endpoint-и за качване (без парола) -
+# защита от случайно/автоматизирано спамене на заявки. Нулира се при рестарт на сървъра,
+# което е приемливо за мащаба на приложението (един сървър, без нужда от Redis).
+_upload_rate_limit: dict[str, list[float]] = {}
+RATE_LIMIT_MAX_REQUESTS = 15
+RATE_LIMIT_WINDOW_SECONDS = 300
+
+def _check_rate_limit(request: Request):
+    client_ip = request.client.host if request.client else "unknown"
+    now = time.time()
+    timestamps = [t for t in _upload_rate_limit.get(client_ip, []) if now - t < RATE_LIMIT_WINDOW_SECONDS]
+    if len(timestamps) >= RATE_LIMIT_MAX_REQUESTS:
+        raise HTTPException(status_code=429, detail="Твърде много заявки. Опитайте отново след няколко минути.")
+    timestamps.append(now)
+    _upload_rate_limit[client_ip] = timestamps
 
 # Материалите се пазят 60 дни, след което се изтриват автоматично (файл + запис)
 CLEANUP_AFTER_DAYS = 60
@@ -177,9 +210,24 @@ async def create_assignment(
     template_id: Optional[str] = Form(None),
     deadline: Optional[str] = Form(None),
     reference_link: Optional[str] = Form(None),
-    reference_file: Optional[UploadFile] = File(None)
+    reference_file: Optional[UploadFile] = File(None),
+    assignment_id: Optional[str] = Form(None)
 ):
-    assignment_id = str(uuid.uuid4())[:8]
+    """
+    Създава нова задача, а ако е подаден assignment_id на съществуваща - я обновява
+    (upsert със същото id), запазвайки досегашните критерии/материали, ако за тях
+    не е подадено нещо ново - редакцията не трябва тихо да ги изтрива.
+    """
+    is_edit = bool(assignment_id)
+    final_id = assignment_id or str(uuid.uuid4())[:8]
+
+    existing_assignment = None
+    if is_edit:
+        existing_res = supabase.table("assignments").select("*").eq("id", final_id).execute()
+        if not existing_res.data:
+            raise HTTPException(status_code=404, detail="Задачата за редакция не е намерена.")
+        existing_assignment = existing_res.data[0]
+
     criteria_parsed = {}
 
     # Шаблон с готови критерии - взима им предимство пред качен Word/ръчен JSON,
@@ -200,28 +248,35 @@ async def create_assignment(
             criteria_parsed = extract_criteria_from_text(extracted_texts)
         except Exception as e:
             raise HTTPException(status_code=400, detail=f"Грешка при четене на Word файла: {str(e)}")
-    elif criteria_json and criteria_json.strip():
+    elif criteria_json and criteria_json.strip() and criteria_json.strip() != "{}":
         try:
             criteria_parsed = json.loads(criteria_json)
         except Exception:
             criteria_parsed = {}
+    elif existing_assignment:
+        # Редакция без нов файл/шаблон - критериите остават непроменени
+        criteria_parsed = existing_assignment.get("criteria_json") or {}
 
-    reference_file_url = None
+    reference_file_url = existing_assignment.get("reference_file_url") if existing_assignment else None
     if reference_file and reference_file.filename:
         try:
             ref_contents = await reference_file.read()
-            ref_path = f"materials/{sanitize_storage_segment(assignment_id)}/{sanitize_storage_segment(reference_file.filename)}"
+            ref_path = f"materials/{sanitize_storage_segment(final_id)}/{sanitize_storage_segment(reference_file.filename)}"
             reference_file_url = upload_to_supabase(ref_contents, reference_file.filename, ref_path)
         except Exception as e:
             print(f"Грешка при качване на помощния материал: {e}")
 
+    reference_link_value = reference_link.strip() if reference_link and reference_link.strip() else None
+    if not reference_link_value and existing_assignment:
+        reference_link_value = existing_assignment.get("reference_link")
+
     data = {
-        "id": assignment_id,
+        "id": final_id,
         "title": title,
         "group_id": group_id,
         "criteria_json": criteria_parsed,
         "deadline": deadline or None,
-        "reference_link": reference_link.strip() if reference_link and reference_link.strip() else None,
+        "reference_link": reference_link_value,
         "reference_file_url": reference_file_url
     }
 
@@ -229,13 +284,13 @@ async def create_assignment(
         supabase.table("assignments").upsert(data).execute()
         return {
             "status": "success",
-            "assignment_id": assignment_id,
+            "assignment_id": final_id,
             "title": title,
             "group_id": group_id,
-            "link": f"/index.html?id={assignment_id}"
+            "link": f"/index.html?id={final_id}"
         }
     except Exception as e:
-        raise HTTPException(status_code=500, detail=f"Грешка при създаване на задача: {str(e)}")
+        raise HTTPException(status_code=500, detail=f"Грешка при {'обновяване' if is_edit else 'създаване'} на задача: {str(e)}")
 
 @app.delete("/api/admin/assignments/{assignment_id}")
 async def delete_assignment(assignment_id: str):
@@ -308,12 +363,14 @@ async def get_assignment(assignment_id: str):
 
 @app.post("/api/evaluate")
 async def evaluate_file(
+    request: Request,
     class_id: str = Form(...),
     student_name: str = Form(...),
     criteria_json: str = Form(...),
     assignment_id: Optional[str] = Form(None),
     file: UploadFile = File(...)
 ):
+    _check_rate_limit(request)
     contents = await file.read()
     file_hash = hashlib.md5(contents).hexdigest()
     meta = extract_office_metadata(contents)
@@ -360,6 +417,25 @@ async def evaluate_file(
         "percentage": percentage,
         "details_json": {"assignment_id": assignment_id, "details": result["details"]}
     }
+
+    # Ако ученикът вече е предавал по тази задача, старото предаване се заменя (файл +
+    # запис) вместо да се трупа като отделен ред - последното предадено решение важи.
+    if assignment_id:
+        try:
+            existing_res = supabase.table("submissions").select("id, storage_path, details_json") \
+                .eq("class_id", class_id).eq("student_name", student_name).execute()
+            for row in (existing_res.data or []):
+                row_details = row.get("details_json")
+                row_assignment_id = row_details.get("assignment_id") if isinstance(row_details, dict) else None
+                if row_assignment_id == assignment_id:
+                    if row.get("storage_path"):
+                        try:
+                            supabase.storage.from_(BUCKET_NAME).remove([row["storage_path"]])
+                        except Exception as e:
+                            print(f"Забележка при изтриване на старо предаване от Storage: {e}")
+                    supabase.table("submissions").delete().eq("id", row["id"]).execute()
+        except Exception as e:
+            print(f"Забележка при проверка за предишно предаване: {e}")
 
     try:
         supabase.table("submissions").insert(submission_data).execute()
@@ -453,10 +529,12 @@ async def get_group_public(group_id: str):
 
 @app.post("/api/exercise/upload")
 async def upload_exercise(
+    request: Request,
     class_id: str = Form(...),
     student_name: str = Form(...),
     file: UploadFile = File(...)
 ):
+    _check_rate_limit(request)
     contents = await file.read()
     storage_path = (
         f"exercises/{sanitize_storage_segment(class_id)}/"

@@ -9,7 +9,18 @@
 </head>
 <body>
 
-    <div class="app-layout">
+    <div id="login-overlay" class="login-overlay">
+        <form id="login-form" class="login-card">
+            <div class="login-icon"><i class="fa-solid fa-lock"></i></div>
+            <h2>VPClassroom - Вход</h2>
+            <p class="subtitle">Въведете администраторската парола, за да продължите.</p>
+            <input type="password" id="login-password" class="custom-input" placeholder="Парола" autocomplete="current-password" required autofocus>
+            <div id="login-error" class="login-error" style="display:none;">Грешна парола. Опитайте отново.</div>
+            <button type="submit" class="btn-primary" style="width:100%; justify-content:center;">Вход</button>
+        </form>
+    </div>
+
+    <div class="app-layout" id="app-layout" hidden>
         <!-- ЛЯВА НАВИГАЦИОННА ЛЕНТА -->
         <aside class="sidebar">
             <div class="sidebar-brand">
@@ -27,6 +38,10 @@
             <button type="button" class="theme-toggle-btn" id="theme-toggle-btn" onclick="toggleTheme()">
                 <i class="fa-solid fa-moon" id="theme-toggle-icon"></i>
                 <span id="theme-toggle-label">Тъмна тема</span>
+            </button>
+            <button type="button" class="theme-toggle-btn" onclick="adminLogout()" style="margin-top:8px;">
+                <i class="fa-solid fa-right-from-bracket"></i>
+                <span>Изход</span>
             </button>
         </aside>
 
@@ -98,6 +113,19 @@
                     </div>
                 </div>
 
+                <div class="table-card" id="criteria-breakdown-card" style="display:none;">
+                    <div class="table-card-header">
+                        <div class="card-title-row">
+                            <div class="icon-chip orange"><i class="fa-solid fa-chart-simple"></i></div>
+                            <div>
+                                <h3>Най-често пропускани критерии</h3>
+                                <div class="card-subtitle">По текущия филтър клас/задача - показва какво да се преговори</div>
+                            </div>
+                        </div>
+                    </div>
+                    <div id="criteria-breakdown-list" class="criteria-breakdown-list"></div>
+                </div>
+
                 <div class="table-card">
                     <div class="table-card-header">
                         <h3 style="margin:0;">Резултати по ученици</h3>
@@ -148,7 +176,7 @@
                 <div class="form-card">
                     <div class="card-title-row">
                         <div class="icon-chip purple"><i class="fa-regular fa-file-lines"></i></div>
-                        <h3>Създай Задача</h3>
+                        <h3 id="assignment-form-title">Създай Задача</h3>
                     </div>
                     <form id="create-assignment-form" class="styled-form">
                         <div class="form-grid">
@@ -206,7 +234,10 @@
                                 <input type="url" id="assign-reference-link" class="custom-input" placeholder="напр. линк към видео/пример">
                             </div>
                         </div>
-                        <button type="submit" class="btn-primary"><i class="fa-solid fa-plus"></i> Създай Задача</button>
+                        <div class="form-actions">
+                            <button type="submit" class="btn-primary" id="assignment-form-submit-btn"><i class="fa-solid fa-plus"></i> Създай Задача</button>
+                            <button type="button" class="btn-secondary" id="assignment-form-cancel-btn" onclick="cancelAssignmentEdit()" style="display:none;">Отказ</button>
+                        </div>
                     </form>
                 </div>
 

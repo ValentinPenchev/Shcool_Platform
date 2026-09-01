@@ -115,7 +115,7 @@ function renderClassesTable(entries) {
     const classesTable = document.getElementById("classes-table-body");
     if (entries.length === 0) {
         classesTable.innerHTML = `
-            <tr><td colspan="4">
+            <tr><td colspan="5">
                 <div class="empty-state">
                     <div class="empty-icon"><i class="fa-solid fa-inbox"></i></div>
                     <h4>Няма намерени класове</h4>
@@ -135,8 +135,11 @@ function classBadgeColorIndex(index) {
     return `c${index % 5}`;
 }
 
-// Маркъп на един ред в таблицата с класове (кликването върху реда отваря резултатите на класа в Статистика)
+// Маркъп на един ред в таблицата с класове (кликването върху реда отваря резултатите на класа в Статистика).
+// Линкът за упражнения е винаги видим тук, за да не се налага влизане в Упражнения
+// и избор на клас само за да се копира линкът.
 function renderClassRow(classId, className, studentsCount, colorIndex = 0) {
+    const exerciseUrl = buildExerciseLink(classId);
     return `
         <tr id="class-row-${classId}" class="clickable-row" onclick="viewClassResults('${classId}')" title="Отвори резултатите за този клас">
             <td>
@@ -147,6 +150,12 @@ function renderClassRow(classId, className, studentsCount, colorIndex = 0) {
             </td>
             <td>${classId}</td>
             <td><i class="fa-solid fa-user-group" style="color: var(--text-muted); margin-right: 6px;"></i>${studentsCount} ученици</td>
+            <td>
+                <div class="file-name-cell">
+                    <a href="${exerciseUrl}" target="_blank" rel="noopener" class="task-link" onclick="event.stopPropagation();">${exerciseUrl}</a>
+                    <button type="button" class="btn-icon" onclick="event.stopPropagation(); copyExerciseLink('${classId}')" title="Копирай линка за упражнения"><i class="fa-regular fa-copy"></i></button>
+                </div>
+            </td>
             <td>
                 <button type="button" class="btn-icon" onclick="event.stopPropagation(); editClass('${classId}')" title="Редактирай класа"><i class="fa-regular fa-pen-to-square"></i></button>
                 <button type="button" class="btn-danger-icon" onclick="event.stopPropagation(); deleteClass('${classId}')" title="Изтрий класа"><i class="fa-regular fa-trash-can"></i></button>
@@ -815,8 +824,8 @@ function buildExerciseLink(classId) {
     return `${window.location.origin}${getSiteBasePath()}index.html?exercise=${encodeURIComponent(classId)}`;
 }
 
-function copyExerciseLink() {
-    const classId = document.getElementById("exercise-class-filter").value;
+function copyExerciseLink(explicitClassId) {
+    const classId = explicitClassId || document.getElementById("exercise-class-filter").value;
     if (!classId) return;
     const url = buildExerciseLink(classId);
     navigator.clipboard?.writeText(url).then(() => {
@@ -865,27 +874,36 @@ async function loadExercisesData() {
     document.getElementById("exercises-link-url").textContent = url;
     linkCard.style.display = "flex";
 
+    // Качванията са основната справка - зареждат се отделно от историята на оценките,
+    // за да не изчезват вече записани качвания само защото по-новата справка за
+    // оценки временно не отговаря (напр. по време на бавен деплой на бекенда).
     try {
-        const [uploadsRes, gradesRes] = await Promise.all([
-            fetch(`${API_URL}/admin/exercises?group_id=${encodeURIComponent(classId)}`),
-            fetch(`${API_URL}/admin/exercise-grades?group_id=${encodeURIComponent(classId)}`)
-        ]);
-        if (!uploadsRes.ok || !gradesRes.ok) throw new Error("Грешка при заявката към сървъра");
+        const uploadsRes = await fetch(`${API_URL}/admin/exercises?group_id=${encodeURIComponent(classId)}`);
+        if (!uploadsRes.ok) throw new Error("Грешка при заявката към сървъра");
         exercisesCache = await uploadsRes.json();
-        exerciseGradesCache = await gradesRes.json();
-        renderExercisesTable(classId);
     } catch (err) {
-        console.error("Грешка при зареждане на упражненията:", err);
+        console.error("Грешка при зареждане на качванията:", err);
         tbody.innerHTML = `
             <tr><td colspan="4">
                 <div class="empty-state">
                     <div class="empty-icon"><i class="fa-solid fa-triangle-exclamation"></i></div>
                     <h4>Грешка при зареждане</h4>
-                    <p>Уверете се, че таблиците "exercise_uploads" и "exercise_grade_log" съществуват в Supabase.</p>
+                    <p>Уверете се, че таблицата "exercise_uploads" съществува в Supabase.</p>
                 </div>
             </td></tr>
         `;
+        return;
     }
+
+    try {
+        const gradesRes = await fetch(`${API_URL}/admin/exercise-grades?group_id=${encodeURIComponent(classId)}`);
+        exerciseGradesCache = gradesRes.ok ? await gradesRes.json() : [];
+    } catch (err) {
+        console.error("Грешка при зареждане на въведените оценки:", err);
+        exerciseGradesCache = [];
+    }
+
+    renderExercisesTable(classId);
 }
 
 // Групира качванията по ученик (и по групи от 5) и рендва таблицата с напредък

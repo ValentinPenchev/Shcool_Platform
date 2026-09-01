@@ -688,6 +688,31 @@ body {
     color: #fff;
 }
 
+/* Постоянен списък с линковете за упражнения по клас, винаги видим в страницата */
+.exercise-links-list {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+    padding: 4px 16px 16px;
+}
+
+.exercise-link-row {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding: 8px 12px;
+    border: 1px solid var(--border-color);
+    border-radius: 8px;
+    flex-wrap: wrap;
+}
+
+.exercise-link-row .task-link {
+    flex: 1;
+    min-width: 160px;
+    word-break: break-all;
+    font-size: 13px;
+}
+
 /* Легенда за статуса на оценките от упражнения (въведена/невъведена) */
 .grade-legend {
     display: flex;

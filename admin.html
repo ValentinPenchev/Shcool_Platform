@@ -227,22 +227,23 @@
                     <span class="legend-item"><span class="legend-dot legend-entered"></span> Оценката е въведена</span>
                 </div>
 
-                <div class="filter-group">
-                    <label>Изберете клас:</label>
-                    <div class="class-chip-row" id="exercises-class-chips"></div>
-                    <select id="exercise-class-filter" class="custom-select" hidden></select>
-                </div>
-
-                <div class="tip-card compact" id="exercises-link-card" style="display:none;">
-                    <i class="fa-solid fa-link tip-icon"></i>
-                    <div>
-                        <strong>Линк за качване на упражнения</strong>
-                        <p>Споделете този линк с класа - всеки качен файл се брои автоматично.</p>
-                        <div class="drop-zone-row" style="margin-top:8px; background:transparent; border:1px dashed var(--border-color); padding:10px;">
-                            <a href="#" id="exercises-link-url" target="_blank" class="task-link" style="word-break: break-all;"></a>
-                            <button type="button" class="btn-icon" onclick="copyExerciseLink()" title="Копирай линка"><i class="fa-regular fa-copy"></i></button>
+                <div class="table-card" id="exercises-all-links-card">
+                    <div class="table-card-header">
+                        <div class="card-title-row">
+                            <div class="icon-chip blue"><i class="fa-solid fa-link"></i></div>
+                            <div>
+                                <h3>Линкове за качване по клас</h3>
+                                <div class="card-subtitle">Винаги видими - споделете съответния линк с класа</div>
+                            </div>
                         </div>
                     </div>
+                    <div id="exercises-all-links-list" class="exercise-links-list"></div>
+                </div>
+
+                <div class="filter-group" style="margin-top: 20px;">
+                    <label>Изберете клас за напредъка по-долу:</label>
+                    <div class="class-chip-row" id="exercises-class-chips"></div>
+                    <select id="exercise-class-filter" class="custom-select" hidden></select>
                 </div>
 
                 <div class="table-card" style="margin-top: 20px;">

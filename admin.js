@@ -489,6 +489,8 @@ async function loadDashboardData() {
         const res = await fetch(url);
         if (!res.ok) throw new Error("Грешка при заявката към сървъра");
         const submissions = await res.json();
+        // Най-новите предавания най-отгоре
+        submissions.sort((a, b) => new Date(b.created_at || 0) - new Date(a.created_at || 0));
         submissionsCache = submissions;
 
         let totalStudentsCount = 0;

@@ -3,16 +3,42 @@ import re
 # Всеки evaluator (word_eval, excel_eval, ppt_eval) чете само тези конкретни ключове
 # от речника с критерии. Абзаците от качения Word документ с критерии се разпознават
 # по ключови думи и се превръщат в тях, за да могат реално да участват в оценяването.
+# Някои ключове (напр. font_color, bold, merged_cells, cell_shading) се проверяват
+# и от word_eval, и от excel_eval - всеки evaluator ги тълкува по свой начин.
 _PRESENCE_KEYWORDS = {
+    # Word
     "table": ["таблиц"],
     "image": ["изображ", "картинк", "снимк", "илюстрац"],
-    "font": ["форматир", "шрифт"],
+    "font": ["форматир"],
+    "paragraph_alignment": ["подравн"],
+    "font_name": ["шрифт"],
+    "font_size": ["големин", "размер на шрифт", "размер на текст"],
+    "bold": ["удебел"],
+    "italic": ["курсив"],
+    "underline": ["подчерта"],
+    "special_characters": ["специални символи", "специален символ"],
+    "merged_cells": ["обединени клетки", "обединяване на клетки"],
+    "cell_shading": ["оцветяване"],
+    "font_color": ["цвят"],
+    # Excel
     "formulas": ["формул"],
     "chart": ["диаграм", "график"],
+    "absolute_reference": ["абсолютен адрес", "относителен адрес", "абсолютна референция", "относителна референция"],
+    "data_types": ["типове данни", "тип данни", "формат на клетки", "валута", "currency"],
+    "borders": ["рамк"],
+    "sort_filter": ["сортиране", "филтриране", "филтър"],
+    "summary_report": ["обобщ"],
+    # PowerPoint
     "has_media": ["аудио", "видео"],
     "has_smartart": ["smartart"],
     "has_transitions": ["преход"],
     "has_animations": ["анимаци"],
+}
+
+# Критерии с изрично число (напр. "минимум 5 колони") - добавят се само ако числото е намерено
+_COUNT_PATTERNS = {
+    "min_columns": re.compile(r"(\d+)\s*колон", re.IGNORECASE),
+    "min_rows": re.compile(r"(\d+)\s*ред", re.IGNORECASE),
 }
 
 # Приема и "точки"/"точка", и съкратеното "т." (напр. "2 т.")
@@ -83,5 +109,19 @@ def extract_criteria_from_text(paragraphs):
             existing = criteria.get(key)
             if not existing or points > existing["points"]:
                 criteria[key] = {"points": points, "description": text}
+
+        for key, pattern in _COUNT_PATTERNS.items():
+            match = pattern.search(text_lower)
+            if not match:
+                continue
+            count = int(match.group(1))
+            existing = criteria.get(key)
+            if not existing or points > existing["points"]:
+                criteria[key] = {"points": points, "count": count, "description": text}
+
+        if "диаграм" in text_lower and ("вид" in text_lower or "тип" in text_lower):
+            existing = criteria.get("chart_type")
+            if not existing or points > existing["points"]:
+                criteria["chart_type"] = {"points": points, "description": text}
 
     return criteria

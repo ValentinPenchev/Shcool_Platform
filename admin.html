@@ -21,8 +21,13 @@
     </div>
 
     <div class="app-layout" id="app-layout" hidden>
+        <button type="button" class="mobile-menu-toggle" id="mobile-menu-toggle" onclick="toggleMobileSidebar()" aria-label="Меню">
+            <i class="fa-solid fa-bars"></i>
+        </button>
+        <div class="sidebar-overlay" id="sidebar-overlay" onclick="closeMobileSidebar()"></div>
+
         <!-- ЛЯВА НАВИГАЦИОННА ЛЕНТА -->
-        <aside class="sidebar">
+        <aside class="sidebar" id="sidebar">
             <div class="sidebar-brand">
                 <i class="fa-solid fa-book-open brand-icon"></i>
                 <h2>VPClassroom</h2>
@@ -66,6 +71,7 @@
                     <button type="button" class="workspace-tab" data-tab="exercises" onclick="showSection('exercises')"><i class="fa-solid fa-dumbbell"></i> Упражнения</button>
                     <button type="button" class="workspace-tab" data-tab="workspace-students" onclick="showSection('workspace-students')"><i class="fa-solid fa-user-group"></i> Ученици</button>
                     <button type="button" class="workspace-tab" data-tab="attendance" onclick="showSection('attendance')"><i class="fa-solid fa-clipboard-check"></i> Присъствие</button>
+                    <button type="button" class="workspace-tab" data-tab="emotions" onclick="showSection('emotions')"><i class="fa-regular fa-face-smile"></i> Емоциометър</button>
                 </div>
                 <button type="button" class="btn-secondary" onclick="exitClassWorkspace()"><i class="fa-solid fa-arrow-left"></i> Всички класове</button>
             </div>
@@ -535,6 +541,36 @@
                         </div>
                     </div>
                     <div id="attendance-list" class="attendance-card-grid"></div>
+                </div>
+            </section>
+
+            <!-- СЕКЦИЯ (в работния панел на клас): Емоциометър -->
+            <section id="sec-emotions" class="dashboard-section" style="display:none;">
+                <div class="section-header-row">
+                    <div class="section-header">
+                        <h1>Емоциометър</h1>
+                        <p class="subtitle" id="emotions-subtitle" style="margin-bottom:0;">Как се чувстват учениците днес?</p>
+                    </div>
+                    <button type="button" class="btn-secondary" onclick="resetEmotions()"><i class="fa-solid fa-rotate-left"></i> Нулирай емоциите</button>
+                </div>
+
+                <div class="tip-card compact" id="emotions-link-card">
+                    <i class="fa-solid fa-link tip-icon"></i>
+                    <div>
+                        <strong>Линк за гласуване</strong>
+                        <p>Споделете този линк с класа (напр. на общ екран) - всеки ученик може да натисне своята емоция.</p>
+                        <div class="drop-zone-row" style="margin-top:8px; background:transparent; border:1px dashed var(--border-color); padding:10px;">
+                            <a href="#" id="emotions-link-url" target="_blank" class="task-link" style="word-break: break-all;"></a>
+                            <button type="button" class="btn-icon" onclick="copyEmotionsLink()" title="Копирай линка"><i class="fa-regular fa-copy"></i></button>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="table-card">
+                    <div class="table-card-header">
+                        <h3 style="margin:0;">Как се чувстваш днес? Натисни върху емоцията!</h3>
+                    </div>
+                    <div id="emotions-grid" class="emotions-grid"></div>
                 </div>
             </section>
         </main>

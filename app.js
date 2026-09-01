@@ -1,11 +1,12 @@
 const API_URL = "https://shcool-platform.onrender.com/api";
 
-// Извличане на assignment_id (?id=123) или клас за свободно качване на упражнения
-// (?exercise=8a) от URL - двата режима споделят една и съща страница/форма
+// Извличане на assignment_id (?id=123), клас за свободно качване на упражнения
+// (?exercise=8a) или клас за емоциометър (?mood=8a) от URL - режимите споделят страницата
 const urlParams = new URLSearchParams(window.location.search);
 const assignmentId = urlParams.get('id');
 const exerciseClassId = urlParams.get('exercise');
-const pageMode = assignmentId ? 'assignment' : (exerciseClassId ? 'exercise' : null);
+const moodClassId = urlParams.get('mood');
+const pageMode = assignmentId ? 'assignment' : (exerciseClassId ? 'exercise' : (moodClassId ? 'mood' : null));
 
 let selectedFile = null;
 let assignmentData = null;
@@ -25,6 +26,7 @@ function showAlert(message) {
 function loadPageContext() {
     if (pageMode === 'assignment') return loadAssignment();
     if (pageMode === 'exercise') return loadExerciseClass();
+    if (pageMode === 'mood') return loadMoodClass();
 
     showAlert("Липсва линк към задача или клас. Помолете учителя за индивидуалния линк.");
     document.getElementById("submission-form").style.display = "none";
@@ -97,6 +99,93 @@ async function loadExerciseClass() {
         console.error("Грешка при зареждане на класа:", err);
         showAlert(err.message || "Грешка при зареждане на класа.");
         document.getElementById("submission-form").style.display = "none";
+    }
+}
+
+// Емоциометър - публична страница за дневно гласуване по клас, без нужда от парола
+const EMOTION_CONFIG = {
+    "Щастлив": { emoji: "😊", cssClass: "happy" },
+    "Тъжен": { emoji: "😢", cssClass: "sad" },
+    "Кисел": { emoji: "😖", cssClass: "sour" },
+    "Доволен": { emoji: "😌", cssClass: "content" },
+    "Любопитен": { emoji: "🤔", cssClass: "curious" },
+    "Притеснен": { emoji: "😰", cssClass: "worried" },
+    "Влюбен": { emoji: "😍", cssClass: "love" }
+};
+let moodCounts = {};
+
+function formatDateForInput(date) {
+    const pad = (n) => String(n).padStart(2, '0');
+    return `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())}`;
+}
+
+async function loadMoodClass() {
+    document.getElementById("submission-card").style.display = "none";
+    document.getElementById("mood-card").style.display = "block";
+
+    try {
+        const res = await fetch(`${API_URL}/groups/${encodeURIComponent(moodClassId)}`);
+        if (!res.ok) throw new Error("Класът не е намерен. Проверете дали линкът е коректен.");
+        const data = await res.json();
+        document.getElementById("mood-class-title").textContent = `Емоциометър за клас ${data.group_name || data.group_id}`;
+    } catch (err) {
+        console.error("Грешка при зареждане на класа:", err);
+        const alertBox = document.getElementById("mood-alert");
+        alertBox.textContent = err.message || "Грешка при зареждане на класа.";
+        alertBox.style.display = "block";
+    }
+
+    await loadMoodCounts();
+}
+
+async function loadMoodCounts() {
+    const today = formatDateForInput(new Date());
+    try {
+        const res = await fetch(`${API_URL}/emotions?group_id=${encodeURIComponent(moodClassId)}&record_date=${today}`);
+        if (!res.ok) throw new Error("Грешка при заявката към сървъра");
+        moodCounts = await res.json();
+    } catch (err) {
+        console.error("Грешка при зареждане на емоциите:", err);
+        moodCounts = {};
+    }
+    renderMoodGrid();
+}
+
+function renderMoodGrid() {
+    const container = document.getElementById("mood-grid");
+    container.innerHTML = Object.keys(EMOTION_CONFIG).map(emotion => {
+        const cfg = EMOTION_CONFIG[emotion];
+        const count = moodCounts[emotion] || 0;
+        return `
+            <button type="button" class="emotion-btn ${cfg.cssClass}" data-emotion="${emotion}" onclick="voteMoodEmotion('${emotion}')">
+                <span class="emotion-emoji">${cfg.emoji}</span>
+                <span class="emotion-label">${emotion}</span>
+                <span class="emotion-count">${count} ${count === 1 ? 'глас' : 'гласа'}</span>
+            </button>
+        `;
+    }).join("");
+}
+
+async function voteMoodEmotion(emotion) {
+    const today = formatDateForInput(new Date());
+    const formData = new FormData();
+    formData.append("class_id", moodClassId);
+    formData.append("record_date", today);
+    formData.append("emotion", emotion);
+
+    try {
+        const res = await fetch(`${API_URL}/emotions/vote`, { method: "POST", body: formData });
+        if (!res.ok) throw new Error("Грешка при гласуването");
+        const result = await res.json();
+        moodCounts[emotion] = result.count;
+        renderMoodGrid();
+        const btn = document.querySelector(`.emotion-btn[data-emotion="${CSS.escape(emotion)}"]`);
+        if (btn) {
+            btn.classList.add("pulse");
+            setTimeout(() => btn.classList.remove("pulse"), 400);
+        }
+    } catch (err) {
+        console.error("Грешка при гласуване:", err);
     }
 }
 

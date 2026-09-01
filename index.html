@@ -18,8 +18,17 @@
     </header>
 
     <main class="page-container">
-        <div class="upload-card">
-            
+        <div class="upload-card mood-card" id="mood-card" style="display:none;">
+            <div class="card-header">
+                <h1 id="mood-class-title">Емоциометър</h1>
+                <p class="subtitle">Как се чувстваш днес? Натисни върху емоцията!</p>
+            </div>
+            <div id="mood-alert" class="page-alert" style="display:none;"></div>
+            <div id="mood-grid" class="emotions-grid"></div>
+        </div>
+
+        <div class="upload-card" id="submission-card">
+
             <div class="card-header">
                 <div class="folder-illustration">
                     <div class="folder-bg">

@@ -187,6 +187,17 @@ async function deleteTemplate(templateId) {
     }
 }
 
+// Мобилно меню - страничната лента се превръща в изскачащо чекмедже под ~900px
+function toggleMobileSidebar() {
+    document.getElementById("sidebar").classList.toggle("mobile-open");
+    document.getElementById("sidebar-overlay").classList.toggle("active");
+}
+
+function closeMobileSidebar() {
+    document.getElementById("sidebar").classList.remove("mobile-open");
+    document.getElementById("sidebar-overlay").classList.remove("active");
+}
+
 // -----------------------------------------------------------------------------
 // РАБОТЕН ПАНЕЛ НА КЛАС - когато е "заключен" клас (чрез Класове в страничната
 // лента), Статистика/Задачи/Упражнения се показват само за него, а горна лента
@@ -256,6 +267,7 @@ function exitClassWorkspace() {
 
 // Превключване между секциите в интерфейса
 function showSection(sectionId) {
+    closeMobileSidebar();
     document.querySelectorAll('.dashboard-section').forEach(sec => sec.style.display = 'none');
     document.getElementById(`sec-${sectionId}`).style.display = 'block';
 
@@ -299,6 +311,10 @@ function showSection(sectionId) {
 
     if (sectionId === 'attendance') {
         loadAttendanceData();
+    }
+
+    if (sectionId === 'emotions') {
+        loadEmotionsData();
     }
 }
 
@@ -873,7 +889,7 @@ function renderAttendanceList() {
             const label = status === 'present' ? 'Присъства' : 'Отсъства';
             const icon = status === 'present' ? 'fa-circle-check' : 'fa-circle-xmark';
             return `
-                <div class="attendance-card" onclick="toggleAttendanceCard('${escapeJsString(name)}')" title="Кликни, за да смениш статуса">
+                <div class="attendance-card" data-student-name="${escapeJsString(name)}" onclick="toggleAttendanceCard('${escapeJsString(name)}')" title="Кликни, за да смениш статуса">
                     <div class="attendance-card-avatar a${index % 5}">${name.slice(0, 1).toUpperCase()}</div>
                     <div class="attendance-card-name">${name}</div>
                     <span class="attendance-status-pill ${status}"><i class="fa-solid ${icon}"></i> ${label}</span>
@@ -912,9 +928,17 @@ async function setAttendance(name, status) {
         const existing = attendanceCache.find(r => r.student_name === name);
         if (existing) { existing.status = status; } else { attendanceCache.push({ student_name: name, status }); }
         renderAttendanceList();
+        pulseAttendanceCard(name);
     } catch (err) {
         showToast("Грешка при отбелязване на присъствие: " + err.message, "error");
     }
+}
+
+function pulseAttendanceCard(name) {
+    const card = document.querySelector(`.attendance-card[data-student-name="${CSS.escape(name)}"]`);
+    if (!card) return;
+    card.classList.add("pulse");
+    setTimeout(() => card.classList.remove("pulse"), 400);
 }
 
 async function markAllAttendance(status) {
@@ -938,6 +962,117 @@ async function markAllAttendance(status) {
         showToast("Присъствието е отбелязано за всички.", "success");
     } catch (err) {
         showToast("Грешка при масово отбелязване: " + err.message, "error");
+    }
+}
+
+// -----------------------------------------------------------------------------
+// ЕМОЦИОМЕТЪР - дневно гласуване по клас (публичен линк + изглед/нулиране в панела)
+// -----------------------------------------------------------------------------
+const EMOTION_CONFIG = {
+    "Щастлив": { emoji: "😊", cssClass: "happy" },
+    "Тъжен": { emoji: "😢", cssClass: "sad" },
+    "Кисел": { emoji: "😖", cssClass: "sour" },
+    "Доволен": { emoji: "😌", cssClass: "content" },
+    "Любопитен": { emoji: "🤔", cssClass: "curious" },
+    "Притеснен": { emoji: "😰", cssClass: "worried" },
+    "Влюбен": { emoji: "😍", cssClass: "love" }
+};
+
+function buildEmotionsLink(classId) {
+    return `${window.location.origin}${getSiteBasePath()}index.html?mood=${encodeURIComponent(classId)}`;
+}
+
+function copyEmotionsLink() {
+    if (!lockedClassId) return;
+    const url = buildEmotionsLink(lockedClassId);
+    navigator.clipboard?.writeText(url).then(() => {
+        showToast("Линкът е копиран.", "success");
+    }).catch(() => {
+        prompt("Копирайте линка ръчно:", url);
+    });
+}
+
+async function loadEmotionsData() {
+    if (!lockedClassId) return;
+    const data = classesData[lockedClassId];
+    document.getElementById("emotions-subtitle").textContent = `Клас: ${data ? data.className : lockedClassId} · Как се чувстват учениците днес?`;
+
+    const url = buildEmotionsLink(lockedClassId);
+    document.getElementById("emotions-link-url").href = url;
+    document.getElementById("emotions-link-url").textContent = url;
+
+    const today = formatDateForInput(new Date());
+    try {
+        const res = await fetch(`${API_URL}/emotions?group_id=${encodeURIComponent(lockedClassId)}&record_date=${today}`);
+        if (!res.ok) throw new Error("Грешка при заявката към сървъра");
+        emotionCounts = await res.json();
+    } catch (err) {
+        console.error("Грешка при зареждане на емоциите:", err);
+        emotionCounts = {};
+    }
+
+    renderEmotionsGrid();
+}
+
+let emotionCounts = {};
+
+function renderEmotionsGrid() {
+    const container = document.getElementById("emotions-grid");
+    if (!container) return;
+    container.innerHTML = Object.keys(EMOTION_CONFIG).map(emotion => {
+        const cfg = EMOTION_CONFIG[emotion];
+        const count = emotionCounts[emotion] || 0;
+        return `
+            <button type="button" class="emotion-btn ${cfg.cssClass}" data-emotion="${emotion}" onclick="voteEmotionFromAdmin('${emotion}')">
+                <span class="emotion-emoji">${cfg.emoji}</span>
+                <span class="emotion-label">${emotion}</span>
+                <span class="emotion-count">${count} ${count === 1 ? 'глас' : 'гласа'}</span>
+            </button>
+        `;
+    }).join("");
+}
+
+async function voteEmotionFromAdmin(emotion) {
+    if (!lockedClassId) return;
+    const today = formatDateForInput(new Date());
+    const formData = new FormData();
+    formData.append("class_id", lockedClassId);
+    formData.append("record_date", today);
+    formData.append("emotion", emotion);
+
+    try {
+        const res = await fetch(`${API_URL}/emotions/vote`, { method: "POST", body: formData });
+        if (!res.ok) throw new Error("Грешка при заявката към сървъра");
+        const result = await res.json();
+        emotionCounts[emotion] = result.count;
+        renderEmotionsGrid();
+        const btn = document.querySelector(`.emotion-btn[data-emotion="${CSS.escape(emotion)}"]`);
+        if (btn) {
+            btn.classList.add("pulse");
+            setTimeout(() => btn.classList.remove("pulse"), 400);
+        }
+    } catch (err) {
+        showToast("Грешка при гласуване: " + err.message, "error");
+    }
+}
+
+async function resetEmotions() {
+    if (!lockedClassId) return;
+    if (!confirm("Сигурни ли сте, че искате да нулирате емоциите за днес?")) return;
+
+    const today = formatDateForInput(new Date());
+    const formData = new FormData();
+    formData.append("class_id", lockedClassId);
+    formData.append("record_date", today);
+
+    try {
+        const res = await adminFetch(`${API_URL}/admin/emotions/reset`, { method: "POST", body: formData });
+        if (!res.ok) throw new Error("Грешка при заявката към сървъра");
+        emotionCounts = {};
+        renderEmotionsGrid();
+        showToast("Емоциите бяха нулирани.", "success");
+    } catch (err) {
+        showToast("Грешка при нулиране: " + err.message, "error");
     }
 }
 

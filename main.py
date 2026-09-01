@@ -720,3 +720,56 @@ async def mark_attendance_bulk(
         return {"status": "success", "count": len(rows)}
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Грешка при масово отбелязване на присъствие: {str(e)}")
+
+# -----------------------------------------------------------------------------
+# 5. ЕМОЦИОМЕТЪР (дневно гласуване по клас - без нужда от парола, за да могат
+#    учениците да гласуват направо от споделен линк, само нулирането е за учителя)
+# -----------------------------------------------------------------------------
+
+EMOTION_LIST = ["Щастлив", "Тъжен", "Кисел", "Доволен", "Любопитен", "Притеснен", "Влюбен"]
+
+@app.get("/api/emotions")
+async def get_emotions(group_id: str, record_date: str):
+    try:
+        res = supabase.table("emotion_votes").select("*") \
+            .eq("class_id", group_id).eq("record_date", record_date).execute()
+        counts = {row["emotion"]: row["count"] for row in (res.data or [])}
+        return {emotion: counts.get(emotion, 0) for emotion in EMOTION_LIST}
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Грешка при четене на емоциите: {str(e)}")
+
+@app.post("/api/emotions/vote")
+async def vote_emotion(
+    request: Request,
+    class_id: str = Form(...),
+    record_date: str = Form(...),
+    emotion: str = Form(...)
+):
+    _check_rate_limit(request)
+    if emotion not in EMOTION_LIST:
+        raise HTTPException(status_code=400, detail="Невалидна емоция.")
+    try:
+        existing = supabase.table("emotion_votes").select("id, count") \
+            .eq("class_id", class_id).eq("record_date", record_date).eq("emotion", emotion).execute()
+        if existing.data:
+            new_count = existing.data[0]["count"] + 1
+            supabase.table("emotion_votes").update({"count": new_count}).eq("id", existing.data[0]["id"]).execute()
+        else:
+            new_count = 1
+            supabase.table("emotion_votes").insert({
+                "class_id": class_id, "record_date": record_date, "emotion": emotion, "count": 1
+            }).execute()
+        return {"status": "success", "emotion": emotion, "count": new_count}
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Грешка при гласуване: {str(e)}")
+
+@app.post("/api/admin/emotions/reset")
+async def reset_emotions(
+    class_id: str = Form(...),
+    record_date: str = Form(...)
+):
+    try:
+        supabase.table("emotion_votes").delete().eq("class_id", class_id).eq("record_date", record_date).execute()
+        return {"status": "success"}
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Грешка при нулиране на емоциите: {str(e)}")

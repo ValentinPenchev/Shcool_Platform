@@ -33,6 +33,13 @@
                 <li id="menu-assignments"><a href="#" onclick="showSection('assignments')"><i class="fa-regular fa-clipboard"></i> Задачи</a></li>
                 <li id="menu-exercises"><a href="#" onclick="showSection('exercises')"><i class="fa-solid fa-dumbbell"></i> Упражнения</a></li>
                 <li id="menu-classes"><a href="#" onclick="showSection('classes')"><i class="fa-solid fa-user-group"></i> Ученици</a></li>
+                <li id="menu-classes-accordion" class="sidebar-accordion">
+                    <a href="#" onclick="toggleClassesAccordion(); return false;">
+                        <i class="fa-solid fa-layer-group"></i> Класове
+                        <i class="fa-solid fa-chevron-down accordion-caret" id="classes-accordion-caret"></i>
+                    </a>
+                    <ul class="sidebar-submenu" id="classes-accordion-list" hidden></ul>
+                </li>
             </ul>
 
             <button type="button" class="theme-toggle-btn" id="theme-toggle-btn" onclick="toggleTheme()">
@@ -47,6 +54,22 @@
 
         <!-- ОСНОВНО СЪДЪРЖАНИЕ -->
         <main class="main-content">
+            <!-- Работен панел на избран клас - винаги видим отгоре, докато е "заключен" клас -->
+            <div id="workspace-bar" class="workspace-bar" style="display:none;">
+                <div class="workspace-bar-title">
+                    <span class="class-badge c0" id="workspace-class-badge"></span>
+                    <strong id="workspace-class-name"></strong>
+                </div>
+                <div class="workspace-tabs">
+                    <button type="button" class="workspace-tab" data-tab="dashboard" onclick="showSection('dashboard')"><i class="fa-solid fa-chart-line"></i> Статистика</button>
+                    <button type="button" class="workspace-tab" data-tab="assignments" onclick="showSection('assignments')"><i class="fa-regular fa-clipboard"></i> Задачи</button>
+                    <button type="button" class="workspace-tab" data-tab="exercises" onclick="showSection('exercises')"><i class="fa-solid fa-dumbbell"></i> Упражнения</button>
+                    <button type="button" class="workspace-tab" data-tab="workspace-students" onclick="showSection('workspace-students')"><i class="fa-solid fa-user-group"></i> Ученици</button>
+                    <button type="button" class="workspace-tab" data-tab="attendance" onclick="showSection('attendance')"><i class="fa-solid fa-clipboard-check"></i> Присъствие</button>
+                </div>
+                <button type="button" class="btn-secondary" onclick="exitClassWorkspace()"><i class="fa-solid fa-arrow-left"></i> Всички класове</button>
+            </div>
+
             <!-- СЕКЦИЯ 1: СТАТИСТИКА / ТАБЛО -->
             <section id="sec-dashboard" class="dashboard-section">
                 <div class="section-header-row">
@@ -57,7 +80,7 @@
                     <button type="button" class="btn-secondary" onclick="exportSubmissionsCSV()"><i class="fa-solid fa-download"></i> Експорт на данни</button>
                 </div>
 
-                <div class="filter-group">
+                <div class="filter-group" id="dashboard-class-filter-group">
                     <label>Бърз достъп по клас:</label>
                     <div class="class-chip-row" id="dashboard-class-chips"></div>
                     <select id="filter-group" onchange="onFilterChange()" class="custom-select" hidden></select>
@@ -267,7 +290,7 @@
                         </div>
                     </div>
 
-                    <div class="filter-group" style="margin: 15px 0;">
+                    <div class="filter-group" id="assignments-class-filter-group" style="margin: 15px 0;">
                         <div class="class-chip-row" id="assignments-class-chips"></div>
                         <select id="filter-assignments-class" onchange="filterAssignmentsTable()" class="custom-select" hidden>
                             <option value="">Всички класове</option>
@@ -306,7 +329,7 @@
                     <span class="legend-item"><span class="legend-dot legend-entered"></span> Оценката е въведена</span>
                 </div>
 
-                <div class="filter-group">
+                <div class="filter-group" id="exercises-class-filter-group">
                     <label>Изберете клас:</label>
                     <div class="class-chip-row" id="exercises-class-chips"></div>
                     <select id="exercise-class-filter" class="custom-select" hidden></select>
@@ -413,6 +436,105 @@
                         <p>Създавайте класове и добавяйте учениците си лесно. Можете да управлявате всички класове от тук.</p>
                     </div>
                     <i class="fa-solid fa-graduation-cap tip-illustration"></i>
+                </div>
+            </section>
+
+            <!-- СЕКЦИЯ (в работния панел на клас): Ученици само за избрания клас -->
+            <section id="sec-workspace-students" class="dashboard-section" style="display:none;">
+                <div class="section-header">
+                    <h1>Ученици</h1>
+                    <p class="subtitle" id="workspace-students-subtitle"></p>
+                </div>
+
+                <div class="form-card">
+                    <div class="card-title-row">
+                        <div class="icon-chip purple"><i class="fa-solid fa-user-group"></i></div>
+                        <h3>Информация за класа</h3>
+                    </div>
+                    <form id="workspace-class-info-form" class="styled-form">
+                        <div class="form-grid">
+                            <div class="form-group">
+                                <label>Идентификатор (ID)</label>
+                                <input type="text" id="workspace-class-id-display" class="custom-input" disabled>
+                            </div>
+                            <div class="form-group">
+                                <label>Име на класа</label>
+                                <input type="text" id="workspace-class-name-input" class="custom-input" required>
+                            </div>
+                        </div>
+                        <div class="form-actions">
+                            <button type="submit" class="btn-primary"><i class="fa-solid fa-check"></i> Запази промените</button>
+                            <button type="button" class="btn-danger-icon-text" onclick="deleteWorkspaceClass()"><i class="fa-regular fa-trash-can"></i> Изтрий класа</button>
+                        </div>
+                    </form>
+                </div>
+
+                <div class="table-card" style="margin-top: 20px;">
+                    <div class="table-card-header">
+                        <h3 style="margin:0;">Списък с ученици</h3>
+                    </div>
+                    <div id="workspace-roster-container"></div>
+                </div>
+            </section>
+
+            <!-- СЕКЦИЯ (в работния панел на клас): Присъствие -->
+            <section id="sec-attendance" class="dashboard-section" style="display:none;">
+                <div class="section-header-row">
+                    <div class="section-header">
+                        <h1>Присъствие</h1>
+                        <p class="subtitle" id="attendance-subtitle" style="margin-bottom:0;"></p>
+                    </div>
+                </div>
+
+                <div class="filter-group">
+                    <label>Дата:</label>
+                    <div class="attendance-date-row">
+                        <button type="button" class="btn-icon" onclick="shiftAttendanceDate(-1)" title="Предишен ден"><i class="fa-solid fa-chevron-left"></i></button>
+                        <input type="date" id="attendance-date-input" class="custom-input" onchange="loadAttendanceData()">
+                        <button type="button" class="btn-icon" onclick="shiftAttendanceDate(1)" title="Следващ ден"><i class="fa-solid fa-chevron-right"></i></button>
+                        <button type="button" class="btn-secondary" onclick="goToTodayAttendance()">Днес</button>
+                    </div>
+                </div>
+
+                <div class="stats-grid">
+                    <div class="stat-card">
+                        <div class="stat-left">
+                            <div class="stat-icon blue"><i class="fa-solid fa-users"></i></div>
+                            <div class="stat-data">
+                                <span class="stat-title">Общо ученици</span>
+                                <div class="stat-main"><strong id="attendance-total">0</strong></div>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="stat-card">
+                        <div class="stat-left">
+                            <div class="stat-icon green"><i class="fa-solid fa-circle-check"></i></div>
+                            <div class="stat-data">
+                                <span class="stat-title">Присъстващи</span>
+                                <div class="stat-main"><strong id="attendance-present">0</strong></div>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="stat-card">
+                        <div class="stat-left">
+                            <div class="stat-icon red"><i class="fa-solid fa-circle-xmark"></i></div>
+                            <div class="stat-data">
+                                <span class="stat-title">Отсъстващи</span>
+                                <div class="stat-main"><strong id="attendance-absent">0</strong></div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="table-card">
+                    <div class="table-card-header">
+                        <h3 style="margin:0;">Отбележи присъствие</h3>
+                        <div>
+                            <button type="button" class="btn-secondary" onclick="markAllAttendance('present')"><i class="fa-solid fa-check-double"></i> Всички присъстват</button>
+                            <button type="button" class="btn-secondary" onclick="markAllAttendance('absent')"><i class="fa-solid fa-xmark"></i> Всички отсъстват</button>
+                        </div>
+                    </div>
+                    <div id="attendance-list" class="attendance-list"></div>
                 </div>
             </section>
         </main>

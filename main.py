@@ -660,3 +660,63 @@ async def mark_exercise_batch_graded(
         "grade_label": EXCELLENT_GRADE_LABEL,
         "remaining_uploads": len(remaining_res.data or [])
     }
+
+# -----------------------------------------------------------------------------
+# 4. ПРИСЪСТВИЕ (по клас и дата)
+# -----------------------------------------------------------------------------
+
+@app.get("/api/admin/attendance")
+async def get_attendance(group_id: str, record_date: str):
+    try:
+        res = supabase.table("attendance_records").select("*") \
+            .eq("class_id", group_id).eq("record_date", record_date).execute()
+        return res.data or []
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Грешка при четене на присъствието: {str(e)}")
+
+@app.post("/api/admin/attendance")
+async def mark_attendance(
+    class_id: str = Form(...),
+    student_name: str = Form(...),
+    record_date: str = Form(...),
+    status: str = Form(...)
+):
+    if status not in ("present", "absent"):
+        raise HTTPException(status_code=400, detail="Невалиден статус.")
+    try:
+        supabase.table("attendance_records").upsert({
+            "class_id": class_id,
+            "student_name": student_name,
+            "record_date": record_date,
+            "status": status
+        }, on_conflict="class_id,student_name,record_date").execute()
+        return {"status": "success"}
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Грешка при отбелязване на присъствие: {str(e)}")
+
+@app.post("/api/admin/attendance/bulk")
+async def mark_attendance_bulk(
+    class_id: str = Form(...),
+    record_date: str = Form(...),
+    status: str = Form(...),
+    students_json: str = Form(...)
+):
+    if status not in ("present", "absent"):
+        raise HTTPException(status_code=400, detail="Невалиден статус.")
+    try:
+        students = json.loads(students_json)
+        if not isinstance(students, list):
+            raise ValueError
+    except Exception:
+        raise HTTPException(status_code=400, detail="Невалиден списък с ученици.")
+
+    try:
+        rows = [
+            {"class_id": class_id, "student_name": name, "record_date": record_date, "status": status}
+            for name in students
+        ]
+        if rows:
+            supabase.table("attendance_records").upsert(rows, on_conflict="class_id,student_name,record_date").execute()
+        return {"status": "success", "count": len(rows)}
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Грешка при масово отбелязване на присъствие: {str(e)}")

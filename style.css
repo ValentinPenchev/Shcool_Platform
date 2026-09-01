@@ -45,6 +45,12 @@
     font-family: 'Segoe UI', system-ui, -apple-system, sans-serif;
 }
 
+/* Гарантира, че атрибутът hidden винаги скрива елемента, дори когато класът му
+   задава явен display (напр. display:flex) - author стилът иначе би го надделял */
+[hidden] {
+    display: none !important;
+}
+
 body {
     background-color: var(--bg-main);
     color: var(--text-dark);
@@ -116,6 +122,158 @@ body {
 .sidebar-menu li a:hover {
     background: #eff6ff;
     color: var(--primary-blue);
+}
+
+/* Разгъващо меню "Класове" в страничната лента */
+.accordion-caret {
+    margin-left: auto;
+    font-size: 11px;
+    transition: transform 0.2s ease;
+}
+
+.sidebar-accordion.expanded .accordion-caret {
+    transform: rotate(180deg);
+}
+
+.sidebar-submenu {
+    list-style: none;
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+    margin: 4px 0 4px 14px;
+    padding-left: 14px;
+    border-left: 2px solid var(--border-color);
+}
+
+.sidebar-submenu li a {
+    display: block;
+    padding: 8px 12px;
+    border-radius: 8px;
+    color: var(--text-muted);
+    text-decoration: none;
+    font-size: 13px;
+    font-weight: 600;
+}
+
+.sidebar-submenu li.active a,
+.sidebar-submenu li a:hover {
+    background: #eff6ff;
+    color: var(--primary-blue);
+}
+
+/* Работен панел на конкретен клас - лента отгоре с бърз достъп до неговите секции */
+.workspace-bar {
+    display: flex;
+    align-items: center;
+    flex-wrap: wrap;
+    gap: 14px;
+    background: var(--card-bg);
+    border: 1px solid var(--border-color);
+    border-radius: 12px;
+    padding: 12px 16px;
+    margin-bottom: 20px;
+}
+
+.workspace-bar-title {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    font-size: 15px;
+    white-space: nowrap;
+}
+
+.workspace-tabs {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 6px;
+    flex: 1;
+}
+
+.workspace-tab {
+    display: inline-flex;
+    align-items: center;
+    gap: 7px;
+    border: 1px solid transparent;
+    background: var(--surface-alt);
+    color: var(--text-muted);
+    border-radius: 999px;
+    padding: 8px 16px;
+    font-size: 13px;
+    font-weight: 600;
+    cursor: pointer;
+}
+
+.workspace-tab:hover {
+    filter: brightness(0.96);
+}
+
+.workspace-tab.active {
+    background: var(--primary-blue);
+    color: #fff;
+}
+
+/* Присъствие */
+.attendance-date-row {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+}
+
+.attendance-date-row .custom-input {
+    width: auto;
+    margin-top: 0;
+}
+
+.attendance-list {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+    padding: 4px 20px 18px;
+}
+
+.attendance-row {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
+    padding: 10px 14px;
+    border: 1px solid var(--border-color);
+    border-radius: 10px;
+}
+
+.attendance-row-name {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    font-weight: 600;
+}
+
+.attendance-toggle {
+    display: flex;
+    gap: 6px;
+}
+
+.attendance-toggle button {
+    border: 1px solid var(--border-color);
+    background: var(--surface-alt);
+    color: var(--text-muted);
+    border-radius: 999px;
+    padding: 6px 14px;
+    font-size: 12px;
+    font-weight: 700;
+    cursor: pointer;
+}
+
+.attendance-toggle button.present.active {
+    background: var(--badge-green-bg);
+    color: var(--badge-green-text);
+    border-color: #16a34a;
+}
+
+.attendance-toggle button.absent.active {
+    background: var(--badge-red-bg);
+    color: var(--badge-red-text);
+    border-color: #dc2626;
 }
 
 .main-content {

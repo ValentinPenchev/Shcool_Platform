@@ -187,6 +187,73 @@ async function deleteTemplate(templateId) {
     }
 }
 
+// -----------------------------------------------------------------------------
+// РАБОТЕН ПАНЕЛ НА КЛАС - когато е "заключен" клас (чрез Класове в страничната
+// лента), Статистика/Задачи/Упражнения се показват само за него, а горна лента
+// (workspace-bar) дава бърз достъп до петте му раздела, вкл. новите Ученици/Присъствие.
+// -----------------------------------------------------------------------------
+let lockedClassId = null;
+
+function toggleClassesAccordion() {
+    const li = document.getElementById("menu-classes-accordion");
+    const list = document.getElementById("classes-accordion-list");
+    const expanded = li.classList.toggle("expanded");
+    list.hidden = !expanded;
+    document.getElementById("classes-accordion-caret").style.transform = expanded ? "rotate(180deg)" : "";
+}
+
+function renderClassesAccordionList() {
+    const list = document.getElementById("classes-accordion-list");
+    if (!list) return;
+    const entries = Object.entries(classesData);
+    if (entries.length === 0) {
+        list.innerHTML = `<li><span class="stat-sub" style="padding:8px 12px; display:block;">Няма класове</span></li>`;
+        return;
+    }
+    list.innerHTML = entries.map(([classId, data]) => `
+        <li class="${lockedClassId === classId ? 'active' : ''}">
+            <a href="#" onclick="enterClassWorkspace('${classId}'); return false;">${data.className}</a>
+        </li>
+    `).join("");
+}
+
+function applyWorkspaceLock() {
+    const bar = document.getElementById("workspace-bar");
+    const locked = !!lockedClassId;
+    bar.style.display = locked ? "flex" : "none";
+
+    ["dashboard-class-filter-group", "assignments-class-filter-group", "exercises-class-filter-group"].forEach(id => {
+        const el = document.getElementById(id);
+        if (el) el.style.display = locked ? "none" : "";
+    });
+
+    if (locked) {
+        const data = classesData[lockedClassId] || {};
+        const name = data.className || lockedClassId;
+        document.getElementById("workspace-class-name").textContent = name;
+        document.getElementById("workspace-class-badge").textContent = name.slice(0, 2);
+    }
+
+    renderClassesAccordionList();
+}
+
+function enterClassWorkspace(classId) {
+    lockedClassId = classId;
+    applyWorkspaceLock();
+    showSection('dashboard');
+}
+
+function exitClassWorkspace() {
+    lockedClassId = null;
+    applyWorkspaceLock();
+    const filterGroup = document.getElementById("filter-group");
+    const filterAssignments = document.getElementById("filter-assignments-class");
+    if (filterGroup) filterGroup.value = "";
+    if (filterAssignments) filterAssignments.value = "";
+    renderClassChips();
+    showSection('dashboard');
+}
+
 // Превключване между секциите в интерфейса
 function showSection(sectionId) {
     document.querySelectorAll('.dashboard-section').forEach(sec => sec.style.display = 'none');
@@ -196,22 +263,42 @@ function showSection(sectionId) {
     const activeMenu = document.getElementById(`menu-${sectionId}`);
     if (activeMenu) activeMenu.classList.add('active');
 
+    document.querySelectorAll('.workspace-tab').forEach(btn => btn.classList.toggle('active', btn.dataset.tab === sectionId));
+
     // Статистиката се презарежда автоматично при отваряне и се опреснява периодично,
     // за да не се налага ръчно презареждане при ново предадено решение
     if (sectionId === 'dashboard') {
+        if (lockedClassId) document.getElementById("filter-group").value = lockedClassId;
         loadDashboardData();
         startDashboardPolling();
     } else {
         stopDashboardPolling();
     }
 
+    if (sectionId === 'assignments') {
+        if (lockedClassId) {
+            document.getElementById("filter-assignments-class").value = lockedClassId;
+            loadAssignments(lockedClassId);
+        }
+    }
+
     if (sectionId === 'exercises') {
         const select = document.getElementById("exercise-class-filter");
-        if (select && !select.value && Object.keys(classesData).length > 0) {
+        if (lockedClassId) {
+            select.value = lockedClassId;
+        } else if (select && !select.value && Object.keys(classesData).length > 0) {
             select.value = Object.keys(classesData)[0];
             renderClassChips();
         }
         loadExercisesData();
+    }
+
+    if (sectionId === 'workspace-students') {
+        loadWorkspaceStudents();
+    }
+
+    if (sectionId === 'attendance') {
+        loadAttendanceData();
     }
 }
 
@@ -251,6 +338,7 @@ async function loadClasses() {
 
         renderClassesTable(Object.entries(classesData));
         renderClassChips();
+        renderClassesAccordionList();
     } catch (err) {
         console.error("Грешка при зареждане на класовете:", err);
     }
@@ -372,7 +460,14 @@ function toggleClassRoster(classId) {
 }
 
 // Изгражда чеклиста с активни ученици + груповите действия + списъка с деактивирани
-function buildClassRosterHtml(classId) {
+// instanceId разграничава два едновременни визуализации на един и същ клас в DOM
+// (напр. общата таблица "Ученици" и работния панел на клас) - без него чекбоксите
+// и груповите действия биха се объркали кой контейнер да четат
+function buildClassRosterHtml(classId, instanceId) {
+    instanceId = instanceId || classId;
+    const scopeId = `roster-instance-${instanceId}`;
+    const moveSelectId = `move-target-${instanceId}`;
+
     const data = classesData[classId] || { students: [], inactiveStudents: [] };
     const students = data.students || [];
     const inactive = data.inactiveStudents || [];
@@ -408,19 +503,19 @@ function buildClassRosterHtml(classId) {
     `;
 
     return `
-        <div class="roster-panel">
+        <div class="roster-panel" id="${scopeId}">
             <div class="roster-toolbar">
                 <label class="checkbox-label">
-                    <input type="checkbox" onchange="toggleAllRosterCheckboxes('${classId}', this.checked)">
+                    <input type="checkbox" onchange="toggleAllRosterCheckboxes('${classId}', this.checked, '${scopeId}')">
                     Избери всички
                 </label>
-                <button type="button" class="btn-danger-icon-text" onclick="bulkDeleteStudents('${classId}')"><i class="fa-regular fa-trash-can"></i> Изтрий избраните</button>
-                <button type="button" class="btn-secondary" onclick="bulkDeactivateStudents('${classId}')"><i class="fa-solid fa-user-slash"></i> Деактивирай избраните</button>
-                <select id="move-target-${classId}" class="custom-select roster-move-select">
+                <button type="button" class="btn-danger-icon-text" onclick="bulkDeleteStudents('${classId}', '${scopeId}')"><i class="fa-regular fa-trash-can"></i> Изтрий избраните</button>
+                <button type="button" class="btn-secondary" onclick="bulkDeactivateStudents('${classId}', '${scopeId}')"><i class="fa-solid fa-user-slash"></i> Деактивирай избраните</button>
+                <select id="${moveSelectId}" class="custom-select roster-move-select">
                     <option value="">-- Премести в клас --</option>
                     ${otherClassesOptions}
                 </select>
-                <button type="button" class="btn-secondary" onclick="bulkMoveStudents('${classId}')"><i class="fa-solid fa-right-left"></i> Премести</button>
+                <button type="button" class="btn-secondary" onclick="bulkMoveStudents('${classId}', '${moveSelectId}', '${scopeId}')"><i class="fa-solid fa-right-left"></i> Премести</button>
             </div>
             ${checklistHtml}
             ${inactiveHtml}
@@ -428,12 +523,16 @@ function buildClassRosterHtml(classId) {
     `;
 }
 
-function toggleAllRosterCheckboxes(classId, checked) {
-    document.querySelectorAll(`.roster-checkbox[data-class="${classId}"]`).forEach(cb => { cb.checked = checked; });
+function toggleAllRosterCheckboxes(classId, checked, scopeId) {
+    const scope = scopeId ? document.getElementById(scopeId) : document;
+    if (!scope) return;
+    scope.querySelectorAll(`.roster-checkbox[data-class="${classId}"]`).forEach(cb => { cb.checked = checked; });
 }
 
-function getCheckedRosterNames(classId) {
-    return Array.from(document.querySelectorAll(`.roster-checkbox[data-class="${classId}"]:checked`)).map(cb => cb.value);
+function getCheckedRosterNames(classId, scopeId) {
+    const scope = scopeId ? document.getElementById(scopeId) : document;
+    if (!scope) return [];
+    return Array.from(scope.querySelectorAll(`.roster-checkbox[data-class="${classId}"]:checked`)).map(cb => cb.value);
 }
 
 // Записва обновен състав на класа (активни + по избор неактивни ученици) и
@@ -461,10 +560,11 @@ async function saveClassRoster(classId, className, students, inactiveStudents) {
     };
     renderClassesTable(Object.entries(classesData));
     renderClassChips();
+    renderClassesAccordionList();
 }
 
-async function bulkDeleteStudents(classId) {
-    const checked = getCheckedRosterNames(classId);
+async function bulkDeleteStudents(classId, scopeId) {
+    const checked = getCheckedRosterNames(classId, scopeId);
     if (checked.length === 0) { showToast("Изберете поне един ученик.", "warning"); return; }
     if (!confirm(`Сигурни ли сте, че искате трайно да изтриете ${checked.length} ученици от класа?`)) return;
 
@@ -473,13 +573,14 @@ async function bulkDeleteStudents(classId) {
     try {
         await saveClassRoster(classId, data.className, newStudents);
         showToast("Учениците бяха изтрити от класа.", "success");
+        refreshRosterViewsForClass(classId);
     } catch (err) {
         showToast("Грешка при изтриване: " + err.message, "error");
     }
 }
 
-async function bulkDeactivateStudents(classId) {
-    const checked = getCheckedRosterNames(classId);
+async function bulkDeactivateStudents(classId, scopeId) {
+    const checked = getCheckedRosterNames(classId, scopeId);
     if (checked.length === 0) { showToast("Изберете поне един ученик.", "warning"); return; }
     if (!confirm(`Да се деактивират ли ${checked.length} ученици? Ще изчезнат от активния списък, но данните им се пазят.`)) return;
 
@@ -489,6 +590,7 @@ async function bulkDeactivateStudents(classId) {
     try {
         await saveClassRoster(classId, data.className, newStudents, newInactive);
         showToast("Учениците бяха деактивирани.", "success");
+        refreshRosterViewsForClass(classId);
     } catch (err) {
         showToast("Грешка при деактивиране: " + err.message, "error");
     }
@@ -501,15 +603,16 @@ async function reactivateStudent(classId, name) {
     try {
         await saveClassRoster(classId, data.className, newStudents, newInactive);
         showToast(`${name} е активиран отново.`, "success");
+        refreshRosterViewsForClass(classId);
     } catch (err) {
         showToast("Грешка при активиране: " + err.message, "error");
     }
 }
 
-async function bulkMoveStudents(classId) {
-    const targetClassId = document.getElementById(`move-target-${classId}`).value;
+async function bulkMoveStudents(classId, moveSelectId, scopeId) {
+    const targetClassId = document.getElementById(moveSelectId).value;
     if (!targetClassId) { showToast("Изберете целеви клас.", "warning"); return; }
-    const checked = getCheckedRosterNames(classId);
+    const checked = getCheckedRosterNames(classId, scopeId);
     if (checked.length === 0) { showToast("Изберете поне един ученик.", "warning"); return; }
 
     const sourceData = classesData[classId];
@@ -523,8 +626,18 @@ async function bulkMoveStudents(classId) {
         await saveClassRoster(classId, sourceData.className, newSourceStudents);
         await saveClassRoster(targetClassId, targetData.className, newTargetStudents);
         showToast("Учениците бяха преместени.", "success");
+        refreshRosterViewsForClass(classId);
     } catch (err) {
         showToast("Грешка при преместване: " + err.message, "error");
+    }
+}
+
+// Обновява панела с ученици в работния панел на клас, ако точно този клас е зареден там
+// (renderClassesTable вече опреснява общата таблица като част от saveClassRoster)
+function refreshRosterViewsForClass(classId) {
+    if (lockedClassId === classId) {
+        const container = document.getElementById("workspace-roster-container");
+        if (container) container.innerHTML = buildClassRosterHtml(classId, "workspace");
     }
 }
 
@@ -560,6 +673,7 @@ function upsertClassInUI(classId, className, students) {
 
     renderClassesTable(Object.entries(classesData));
     renderClassChips();
+    renderClassesAccordionList();
 }
 
 // Зарежда данните за клас обратно във формата, за да могат да бъдат редактирани
@@ -649,12 +763,169 @@ async function deleteClass(classId) {
         document.querySelectorAll(`#filter-group option[value="${classId}"], #assign-group-select option[value="${classId}"], #filter-assignments-class option[value="${classId}"], #exercise-class-filter option[value="${classId}"]`)
             .forEach(opt => opt.remove());
         renderClassChips();
+        renderClassesAccordionList();
 
         if (editingClassId === classId) cancelClassEdit();
+        if (lockedClassId === classId) exitClassWorkspace();
 
         loadAssignments();
     } catch (err) {
         showToast("Грешка при изтриване на класа: " + err.message, "error");
+    }
+}
+
+// Изтрива класа, който в момента е зареден в работния панел
+function deleteWorkspaceClass() {
+    if (lockedClassId) deleteClass(lockedClassId);
+}
+
+// Раздел "Ученици" в работния панел на клас - показва списъка веднага, без разгъване
+function loadWorkspaceStudents() {
+    if (!lockedClassId) return;
+    const data = classesData[lockedClassId];
+    if (!data) return;
+
+    document.getElementById("workspace-students-subtitle").textContent = `Клас: ${data.className} (${lockedClassId})`;
+    document.getElementById("workspace-class-id-display").value = lockedClassId;
+    document.getElementById("workspace-class-name-input").value = data.className;
+    document.getElementById("workspace-roster-container").innerHTML = buildClassRosterHtml(lockedClassId, "workspace");
+}
+
+document.getElementById("workspace-class-info-form")?.addEventListener("submit", async (e) => {
+    e.preventDefault();
+    if (!lockedClassId) return;
+
+    const newName = document.getElementById("workspace-class-name-input").value.trim();
+    const data = classesData[lockedClassId];
+    try {
+        await saveClassRoster(lockedClassId, newName, data.students || [], data.inactiveStudents || []);
+        showToast("Класът е обновен успешно!", "success");
+        applyWorkspaceLock();
+    } catch (err) {
+        showToast("Грешка при запазване: " + err.message, "error");
+    }
+});
+
+// -----------------------------------------------------------------------------
+// ПРИСЪСТВИЕ - раздел в работния панел на клас, по дата
+// -----------------------------------------------------------------------------
+let attendanceCache = [];
+
+function formatDateForInput(date) {
+    const pad = (n) => String(n).padStart(2, '0');
+    return `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())}`;
+}
+
+function goToTodayAttendance() {
+    document.getElementById("attendance-date-input").value = formatDateForInput(new Date());
+    loadAttendanceData();
+}
+
+function shiftAttendanceDate(delta) {
+    const input = document.getElementById("attendance-date-input");
+    const current = input.value ? new Date(input.value + "T00:00:00") : new Date();
+    current.setDate(current.getDate() + delta);
+    input.value = formatDateForInput(current);
+    loadAttendanceData();
+}
+
+async function loadAttendanceData() {
+    if (!lockedClassId) return;
+    const input = document.getElementById("attendance-date-input");
+    if (!input.value) input.value = formatDateForInput(new Date());
+
+    const data = classesData[lockedClassId];
+    document.getElementById("attendance-subtitle").textContent = `Клас: ${data ? data.className : lockedClassId}`;
+
+    try {
+        const res = await adminFetch(`${API_URL}/admin/attendance?group_id=${encodeURIComponent(lockedClassId)}&record_date=${input.value}`);
+        if (!res.ok) throw new Error("Грешка при заявката към сървъра");
+        attendanceCache = await res.json();
+    } catch (err) {
+        console.error("Грешка при зареждане на присъствието:", err);
+        attendanceCache = [];
+    }
+
+    renderAttendanceList();
+}
+
+function renderAttendanceList() {
+    if (!lockedClassId) return;
+    const data = classesData[lockedClassId] || { students: [] };
+    const students = data.students || [];
+    const statusByName = {};
+    attendanceCache.forEach(r => { statusByName[r.student_name] = r.status; });
+
+    const container = document.getElementById("attendance-list");
+    if (students.length === 0) {
+        container.innerHTML = `<p class="stat-sub" style="padding:12px;">Няма ученици в този клас.</p>`;
+    } else {
+        container.innerHTML = students.map((name, index) => {
+            const status = statusByName[name];
+            return `
+                <div class="attendance-row">
+                    <div class="attendance-row-name">
+                        <span class="row-avatar a${index % 5}">${name.slice(0, 1).toUpperCase()}</span>
+                        ${name}
+                    </div>
+                    <div class="attendance-toggle">
+                        <button type="button" class="present ${status === 'present' ? 'active' : ''}" onclick="setAttendance('${escapeJsString(name)}', 'present')">Присъства</button>
+                        <button type="button" class="absent ${status === 'absent' ? 'active' : ''}" onclick="setAttendance('${escapeJsString(name)}', 'absent')">Отсъства</button>
+                    </div>
+                </div>
+            `;
+        }).join("");
+    }
+
+    const total = students.length;
+    const present = students.filter(name => statusByName[name] === 'present').length;
+    const absent = students.filter(name => statusByName[name] === 'absent').length;
+    document.getElementById("attendance-total").textContent = total;
+    document.getElementById("attendance-present").textContent = present;
+    document.getElementById("attendance-absent").textContent = absent;
+}
+
+async function setAttendance(name, status) {
+    if (!lockedClassId) return;
+    const input = document.getElementById("attendance-date-input");
+    const formData = new FormData();
+    formData.append("class_id", lockedClassId);
+    formData.append("student_name", name);
+    formData.append("record_date", input.value);
+    formData.append("status", status);
+
+    try {
+        const res = await adminFetch(`${API_URL}/admin/attendance`, { method: "POST", body: formData });
+        if (!res.ok) throw new Error("Грешка при заявката към сървъра");
+        const existing = attendanceCache.find(r => r.student_name === name);
+        if (existing) { existing.status = status; } else { attendanceCache.push({ student_name: name, status }); }
+        renderAttendanceList();
+    } catch (err) {
+        showToast("Грешка при отбелязване на присъствие: " + err.message, "error");
+    }
+}
+
+async function markAllAttendance(status) {
+    if (!lockedClassId) return;
+    const data = classesData[lockedClassId] || { students: [] };
+    const students = data.students || [];
+    if (students.length === 0) return;
+
+    const input = document.getElementById("attendance-date-input");
+    const formData = new FormData();
+    formData.append("class_id", lockedClassId);
+    formData.append("record_date", input.value);
+    formData.append("status", status);
+    formData.append("students_json", JSON.stringify(students));
+
+    try {
+        const res = await adminFetch(`${API_URL}/admin/attendance/bulk`, { method: "POST", body: formData });
+        if (!res.ok) throw new Error("Грешка при заявката към сървъра");
+        attendanceCache = students.map(name => ({ student_name: name, status }));
+        renderAttendanceList();
+        showToast("Присъствието е отбелязано за всички.", "success");
+    } catch (err) {
+        showToast("Грешка при масово отбелязване: " + err.message, "error");
     }
 }
 

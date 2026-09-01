@@ -20,6 +20,7 @@
             <ul class="sidebar-menu">
                 <li id="menu-dashboard" class="active"><a href="#" onclick="showSection('dashboard')"><i class="fa-solid fa-chart-line"></i> Статистика</a></li>
                 <li id="menu-assignments"><a href="#" onclick="showSection('assignments')"><i class="fa-regular fa-clipboard"></i> Задачи</a></li>
+                <li id="menu-exercises"><a href="#" onclick="showSection('exercises')"><i class="fa-solid fa-dumbbell"></i> Упражнения</a></li>
                 <li id="menu-classes"><a href="#" onclick="showSection('classes')"><i class="fa-solid fa-user-group"></i> Ученици</a></li>
             </ul>
         </aside>
@@ -36,14 +37,12 @@
                     <button type="button" class="btn-secondary" onclick="exportSubmissionsCSV()"><i class="fa-solid fa-download"></i> Експорт на данни</button>
                 </div>
 
+                <div class="filter-group">
+                    <label>Бърз достъп по клас:</label>
+                    <div class="class-chip-row" id="dashboard-class-chips"></div>
+                    <select id="filter-group" onchange="onFilterChange()" class="custom-select" hidden></select>
+                </div>
                 <div class="filters-row">
-                    <div class="filter-group">
-                        <label for="filter-group">Филтър по клас:</label>
-                        <div class="select-icon-wrap">
-                            <i class="fa-solid fa-user-group"></i>
-                            <select id="filter-group" onchange="onFilterChange()" class="custom-select"></select>
-                        </div>
-                    </div>
                     <div class="filter-group">
                         <label for="filter-assignment">Задача:</label>
                         <div class="select-icon-wrap">
@@ -191,8 +190,9 @@
                         </div>
                     </div>
 
-                    <div class="filter-group" style="margin: 15px 0; max-width: 300px;">
-                        <select id="filter-assignments-class" onchange="filterAssignmentsTable()" class="custom-select">
+                    <div class="filter-group" style="margin: 15px 0;">
+                        <div class="class-chip-row" id="assignments-class-chips"></div>
+                        <select id="filter-assignments-class" onchange="filterAssignmentsTable()" class="custom-select" hidden>
                             <option value="">Всички класове</option>
                         </select>
                     </div>
@@ -208,6 +208,54 @@
                                 </tr>
                             </thead>
                             <tbody id="assignments-table-body"></tbody>
+                        </table>
+                    </div>
+                </div>
+            </section>
+
+            <!-- СЕКЦИЯ: УПРАЖНЕНИЯ (свободни качвания за практика, без автоматична проверка) -->
+            <section id="sec-exercises" class="dashboard-section" style="display:none;">
+                <div class="section-header-row">
+                    <div class="section-header">
+                        <h1>Упражнения</h1>
+                        <p class="subtitle" style="margin-bottom:0;">Свободни качвания за практика - не се проверяват автоматично. При 5 качвания ученикът получава оценка Отличен.</p>
+                    </div>
+                </div>
+
+                <div class="filter-group">
+                    <label>Изберете клас:</label>
+                    <div class="class-chip-row" id="exercises-class-chips"></div>
+                    <select id="exercise-class-filter" class="custom-select" hidden></select>
+                </div>
+
+                <div class="tip-card compact" id="exercises-link-card" style="display:none;">
+                    <i class="fa-solid fa-link tip-icon"></i>
+                    <div>
+                        <strong>Линк за качване на упражнения</strong>
+                        <p>Споделете този линк с класа - всеки качен файл се брои автоматично.</p>
+                        <div class="drop-zone-row" style="margin-top:8px; background:transparent; border:1px dashed var(--border-color); padding:10px;">
+                            <a href="#" id="exercises-link-url" target="_blank" class="task-link" style="word-break: break-all;"></a>
+                            <button type="button" class="btn-icon" onclick="copyExerciseLink()" title="Копирай линка"><i class="fa-regular fa-copy"></i></button>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="table-card" style="margin-top: 20px;">
+                    <div class="table-card-header">
+                        <h3 style="margin:0;">Напредък по ученици</h3>
+                    </div>
+                    <div class="table-responsive">
+                        <table class="styled-table" id="exercises-table">
+                            <thead>
+                                <tr>
+                                    <th></th>
+                                    <th>Ученик</th>
+                                    <th>Брой качвания</th>
+                                    <th>Прогрес до Отличен</th>
+                                    <th>Оценка</th>
+                                </tr>
+                            </thead>
+                            <tbody></tbody>
                         </table>
                     </div>
                 </div>

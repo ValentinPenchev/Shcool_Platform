@@ -26,6 +26,15 @@ function showSection(sectionId) {
     } else {
         stopDashboardPolling();
     }
+
+    if (sectionId === 'exercises') {
+        const select = document.getElementById("exercise-class-filter");
+        if (select && !select.value && Object.keys(classesData).length > 0) {
+            select.value = Object.keys(classesData)[0];
+            renderClassChips();
+        }
+        loadExercisesData();
+    }
 }
 
 // Локално кеширани данни за класовете (пълния списък ученици за нуждите на редакция)
@@ -59,9 +68,46 @@ async function loadClasses() {
         });
 
         renderClassesTable(Object.entries(classesData));
+        renderClassChips();
     } catch (err) {
         console.error("Грешка при зареждане на класовете:", err);
     }
+}
+
+// Бърз достъп до класовете чрез цветни бутони вместо падащо меню. Всеки чип-ред
+// управлява едно скрито <select>, за да се преизползва вече съществуващата логика
+// за филтриране (onFilterChange, filterAssignmentsTable, loadExercisesData).
+const CLASS_CHIP_CONFIGS = [
+    { chipsId: "dashboard-class-chips", selectId: "filter-group", onSelect: (id) => { document.getElementById("filter-group").value = id; onFilterChange(); } },
+    { chipsId: "assignments-class-chips", selectId: "filter-assignments-class", onSelect: (id) => { document.getElementById("filter-assignments-class").value = id; filterAssignmentsTable(); } },
+    { chipsId: "exercises-class-chips", selectId: "exercise-class-filter", onSelect: (id) => { document.getElementById("exercise-class-filter").value = id; loadExercisesData(); } },
+];
+
+function renderClassChips() {
+    const entries = Object.entries(classesData);
+
+    CLASS_CHIP_CONFIGS.forEach(({ chipsId, selectId, onSelect }) => {
+        const container = document.getElementById(chipsId);
+        const select = document.getElementById(selectId);
+        if (!container || !select) return;
+
+        const currentValue = select.value || "";
+        const includeAll = chipsId !== "exercises-class-chips";
+
+        const chips = [];
+        if (includeAll) {
+            chips.push(`<button type="button" class="class-chip ${currentValue === '' ? 'active' : ''}" data-class-id="">Всички</button>`);
+        }
+        entries.forEach(([classId, data], index) => {
+            const isActive = currentValue === classId;
+            chips.push(`<button type="button" class="class-chip ${classBadgeColorIndex(index)} ${isActive ? 'active' : ''}" data-class-id="${classId}">${data.className}</button>`);
+        });
+
+        container.innerHTML = chips.join("");
+        container.querySelectorAll(".class-chip").forEach(btn => {
+            btn.addEventListener("click", () => onSelect(btn.dataset.classId));
+        });
+    });
 }
 
 // Рендва цялото тяло на таблицата с класове от подаден списък от [classId, data] двойки
@@ -142,8 +188,10 @@ function upsertClassInUI(classId, className, students) {
     addOptionIfMissing(document.getElementById("filter-group"));
     addOptionIfMissing(document.getElementById("assign-group-select"));
     addOptionIfMissing(document.getElementById("filter-assignments-class"));
+    addOptionIfMissing(document.getElementById("exercise-class-filter"));
 
     renderClassesTable(Object.entries(classesData));
+    renderClassChips();
 }
 
 // Зарежда данните за клас обратно във формата, за да могат да бъдат редактирани
@@ -191,8 +239,9 @@ async function deleteClass(classId) {
 
         delete classesData[classId];
         renderClassesTable(Object.entries(classesData));
-        document.querySelectorAll(`#filter-group option[value="${classId}"], #assign-group-select option[value="${classId}"], #filter-assignments-class option[value="${classId}"]`)
+        document.querySelectorAll(`#filter-group option[value="${classId}"], #assign-group-select option[value="${classId}"], #filter-assignments-class option[value="${classId}"], #exercise-class-filter option[value="${classId}"]`)
             .forEach(opt => opt.remove());
+        renderClassChips();
 
         if (editingClassId === classId) cancelClassEdit();
 
@@ -751,4 +800,160 @@ function exportSubmissionsCSV() {
     link.click();
     document.body.removeChild(link);
     URL.revokeObjectURL(url);
+}
+
+// -----------------------------------------------------------------------------
+// УПРАЖНЕНИЯ (свободни качвания за практика, без автоматична проверка)
+// -----------------------------------------------------------------------------
+
+const EXCELLENT_UPLOAD_THRESHOLD = 5;
+let exercisesCache = [];
+
+function buildExerciseLink(classId) {
+    return `${window.location.origin}${getSiteBasePath()}index.html?exercise=${encodeURIComponent(classId)}`;
+}
+
+function copyExerciseLink() {
+    const classId = document.getElementById("exercise-class-filter").value;
+    if (!classId) return;
+    const url = buildExerciseLink(classId);
+    navigator.clipboard?.writeText(url).then(() => {
+        alert("Линкът е копиран: " + url);
+    }).catch(() => {
+        prompt("Копирайте линка ръчно:", url);
+    });
+}
+
+// Зарежда всички качвания за избрания клас и обновява линк-картата и таблицата
+async function loadExercisesData() {
+    const classId = document.getElementById("exercise-class-filter").value;
+    const linkCard = document.getElementById("exercises-link-card");
+    const tbody = document.querySelector("#exercises-table tbody");
+
+    if (!classId) {
+        linkCard.style.display = "none";
+        tbody.innerHTML = `
+            <tr><td colspan="5">
+                <div class="empty-state">
+                    <div class="empty-icon"><i class="fa-solid fa-user-group"></i></div>
+                    <h4>Изберете клас</h4>
+                    <p>Изберете клас отгоре, за да видите напредъка по упражнения.</p>
+                </div>
+            </td></tr>
+        `;
+        return;
+    }
+
+    const url = buildExerciseLink(classId);
+    document.getElementById("exercises-link-url").href = url;
+    document.getElementById("exercises-link-url").textContent = url;
+    linkCard.style.display = "flex";
+
+    try {
+        const res = await fetch(`${API_URL}/admin/exercises?group_id=${encodeURIComponent(classId)}`);
+        if (!res.ok) throw new Error("Грешка при заявката към сървъра");
+        exercisesCache = await res.json();
+        renderExercisesTable(classId);
+    } catch (err) {
+        console.error("Грешка при зареждане на упражненията:", err);
+        tbody.innerHTML = `
+            <tr><td colspan="5">
+                <div class="empty-state">
+                    <div class="empty-icon"><i class="fa-solid fa-triangle-exclamation"></i></div>
+                    <h4>Грешка при зареждане</h4>
+                    <p>Уверете се, че таблицата "exercise_uploads" съществува в Supabase.</p>
+                </div>
+            </td></tr>
+        `;
+    }
+}
+
+// Групира качванията по ученик и рендва обобщената таблица с напредък
+function renderExercisesTable(classId) {
+    const tbody = document.querySelector("#exercises-table tbody");
+    const students = (classesData[classId] && classesData[classId].students) || [];
+
+    const byStudent = {};
+    students.forEach(name => { byStudent[name] = []; });
+    exercisesCache.forEach(upload => {
+        const name = upload.student_name || "Неизвестен";
+        if (!byStudent[name]) byStudent[name] = [];
+        byStudent[name].push(upload);
+    });
+
+    const names = Object.keys(byStudent);
+    if (names.length === 0) {
+        tbody.innerHTML = `
+            <tr><td colspan="5">
+                <div class="empty-state">
+                    <div class="empty-icon"><i class="fa-solid fa-inbox"></i></div>
+                    <h4>Няма ученици в този клас</h4>
+                </div>
+            </td></tr>
+        `;
+        return;
+    }
+
+    tbody.innerHTML = names.map((name, index) => {
+        const uploads = byStudent[name].slice().sort((a, b) => new Date(b.created_at || 0) - new Date(a.created_at || 0));
+        const count = uploads.length;
+        const isExcellent = count >= EXCELLENT_UPLOAD_THRESHOLD;
+        const pct = Math.min(100, Math.round((count / EXCELLENT_UPLOAD_THRESHOLD) * 100));
+        const rowId = `exercise-student-${index}`;
+
+        const gradeCell = isExcellent
+            ? `<span class="badge-status grade-badge grade-high">6 (Отличен)</span>`
+            : '—';
+
+        const detailRows = uploads.length === 0
+            ? `<div class="submission-detail-empty">Няма качени упражнения все още.</div>`
+            : `<ul class="missed-criteria-list">${uploads.map(u => `
+                <li>
+                    <i class="fa-regular fa-file-lines"></i> ${u.filename || 'Файл'} · ${formatSubmittedAt(u.created_at)}
+                    ${u.file_url && u.file_url !== '#' ? `<a href="${u.file_url}" target="_blank" rel="noopener" class="btn-icon" title="Отвори"><i class="fa-regular fa-eye"></i></a>` : ''}
+                    <button type="button" class="btn-danger-icon" onclick="event.stopPropagation(); deleteExerciseUpload(${u.id}, '${classId}')" title="Изтрий качването"><i class="fa-regular fa-trash-can"></i></button>
+                </li>
+              `).join('')}</ul>`;
+
+        return `
+            <tr class="clickable-row" onclick="toggleExerciseDetails('${rowId}')">
+                <td><button type="button" class="btn-icon expand-toggle" id="toggle-${rowId}" title="Детайли по качвания"><i class="fa-solid fa-chevron-right"></i></button></td>
+                <td><span class="row-avatar a${index % 5}">${name.slice(0, 1).toUpperCase()}</span><strong>${name}</strong></td>
+                <td>${count}</td>
+                <td>
+                    <div class="progress-bar-track"><div class="progress-bar-fill ${isExcellent ? 'complete' : ''}" style="width:${pct}%"></div></div>
+                    <span class="stat-sub">${Math.min(count, EXCELLENT_UPLOAD_THRESHOLD)} / ${EXCELLENT_UPLOAD_THRESHOLD}</span>
+                </td>
+                <td>${gradeCell}</td>
+            </tr>
+            <tr class="submission-detail-row" id="detail-${rowId}" hidden>
+                <td colspan="5">${detailRows}</td>
+            </tr>
+        `;
+    }).join("");
+}
+
+function toggleExerciseDetails(rowId) {
+    const row = document.getElementById(`detail-${rowId}`);
+    const toggleBtn = document.getElementById(`toggle-${rowId}`);
+    if (!row) return;
+    row.hidden = !row.hidden;
+    if (toggleBtn) toggleBtn.classList.toggle('expanded', !row.hidden);
+}
+
+async function deleteExerciseUpload(uploadId, classId) {
+    if (!confirm("Сигурни ли сте, че искате да изтриете това качване? Файлът също ще бъде премахнат.")) return;
+
+    try {
+        const response = await fetch(`${API_URL}/admin/exercises/${uploadId}`, { method: "DELETE" });
+        if (!response.ok) {
+            const errData = await response.json().catch(() => ({}));
+            throw new Error(errData.detail || `HTTP грешка: ${response.status}`);
+        }
+
+        exercisesCache = exercisesCache.filter(u => u.id !== uploadId);
+        renderExercisesTable(classId);
+    } catch (err) {
+        alert("Грешка при изтриване на качването: " + err.message);
+    }
 }

@@ -94,3 +94,25 @@ def cleanup_expired_files(days: int = 60):
         print(f"Почистването завърши успешно: Премахнати са {len(ids_to_delete)} остарели записи/файла.")
     except Exception as e:
         print(f"Забележка при почистването на остарели файлове: {e}")
+
+    # Същото 60-дневно правило и за свободните качвания на упражнения. Обвито отделно,
+    # за да не пречи, докато таблицата exercise_uploads все още не е създадена в Supabase.
+    try:
+        cutoff_date = (datetime.utcnow() - timedelta(days=days)).isoformat()
+        response = supabase.table("exercise_uploads").select("*").lt("created_at", cutoff_date).execute()
+        old_records = response.data
+
+        if not old_records:
+            return
+
+        paths_to_delete = [rec["storage_path"] for rec in old_records if rec.get("storage_path")]
+        ids_to_delete = [rec["id"] for rec in old_records if "id" in rec]
+
+        if paths_to_delete:
+            supabase.storage.from_(BUCKET_NAME).remove(paths_to_delete)
+        if ids_to_delete:
+            supabase.table("exercise_uploads").delete().in_("id", ids_to_delete).execute()
+
+        print(f"Почистването на упражнения завърши успешно: Премахнати са {len(ids_to_delete)} остарели записи/файла.")
+    except Exception as e:
+        print(f"Забележка при почистването на остарели упражнения: {e}")

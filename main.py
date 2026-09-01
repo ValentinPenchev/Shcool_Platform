@@ -338,3 +338,90 @@ async def delete_submission(submission_id: int):
         return {"status": "success", "message": f"Предаването {submission_id} е изтрито."}
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Грешка при изтриване: {str(e)}")
+
+# -----------------------------------------------------------------------------
+# 3. УПРАЖНЕНИЯ (свободни качвания за практика, без автоматична проверка)
+# -----------------------------------------------------------------------------
+# Отделени от submissions умишлено - тук не се оценяват критерии, а само се
+# брои колко пъти ученикът е качил работа в класа. При 5 качвания получава
+# автоматично оценка "Отличен" (6), изчислена винаги от текущия брой записи,
+# а не пазена отделно, за да няма разминаване при изтриване на качване.
+EXCELLENT_UPLOAD_THRESHOLD = 5
+
+@app.get("/api/groups/{group_id}")
+async def get_group_public(group_id: str):
+    res = supabase.table("groups").select("*").eq("group_id", group_id).execute()
+    if not res.data:
+        raise HTTPException(status_code=404, detail="Класът не е намерен.")
+    group = res.data[0]
+    return {
+        "group_id": group["group_id"],
+        "group_name": group.get("group_name", group_id),
+        "students": group.get("students_json", [])
+    }
+
+@app.post("/api/exercise/upload")
+async def upload_exercise(
+    class_id: str = Form(...),
+    student_name: str = Form(...),
+    file: UploadFile = File(...)
+):
+    contents = await file.read()
+    storage_path = (
+        f"exercises/{sanitize_storage_segment(class_id)}/"
+        f"{sanitize_storage_segment(student_name)}_{uuid.uuid4().hex[:6]}_{sanitize_storage_segment(file.filename)}"
+    )
+
+    try:
+        file_url = upload_to_supabase(contents, file.filename, storage_path)
+    except Exception:
+        file_url = "#"
+
+    try:
+        supabase.table("exercise_uploads").insert({
+            "class_id": class_id,
+            "student_name": student_name,
+            "filename": file.filename,
+            "storage_path": storage_path,
+            "file_url": file_url,
+        }).execute()
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Грешка при запис на качването: {str(e)}")
+
+    count_res = supabase.table("exercise_uploads").select("id") \
+        .eq("class_id", class_id).eq("student_name", student_name).execute()
+    count = len(count_res.data or [])
+
+    return {
+        "status": "success",
+        "filename": file.filename,
+        "count": count,
+        "remaining": max(0, EXCELLENT_UPLOAD_THRESHOLD - count),
+        "excellent": count >= EXCELLENT_UPLOAD_THRESHOLD
+    }
+
+@app.get("/api/admin/exercises")
+async def get_exercise_uploads(group_id: Optional[str] = None):
+    try:
+        query = supabase.table("exercise_uploads").select("*")
+        if group_id:
+            query = query.eq("class_id", group_id)
+        res = query.order("created_at", desc=True).execute()
+        return res.data or []
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Грешка при четене на упражненията: {str(e)}")
+
+@app.delete("/api/admin/exercises/{upload_id}")
+async def delete_exercise_upload(upload_id: int):
+    try:
+        res = supabase.table("exercise_uploads").select("storage_path").eq("id", upload_id).execute()
+        if res.data and res.data[0].get("storage_path"):
+            try:
+                supabase.storage.from_(BUCKET_NAME).remove([res.data[0]["storage_path"]])
+            except Exception as e:
+                print(f"Забележка при изтриване на файла от Storage: {e}")
+
+        supabase.table("exercise_uploads").delete().eq("id", upload_id).execute()
+        return {"status": "success", "message": f"Качването {upload_id} е изтрито."}
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Грешка при изтриване: {str(e)}")

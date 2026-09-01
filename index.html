@@ -34,13 +34,14 @@
 
             <div id="result-panel" class="result-panel" style="display:none;">
                 <div class="result-icon success"><i class="fa-solid fa-circle-check"></i></div>
-                <h2>Материалът е предаден успешно!</h2>
+                <h2 id="result-title">Материалът е предаден успешно!</h2>
                 <p class="subtitle" id="result-filename"></p>
-                <div class="result-score">
+                <div class="result-score" id="result-score-row">
                     <strong id="result-score-value">0</strong> / <span id="result-max-score">0</span> точки
                     <span id="result-percentage" class="result-percentage">0%</span>
                 </div>
                 <div class="badge-status grade-badge" id="result-grade" style="margin-top:10px; display:none;"></div>
+                <div id="result-exercise-progress" class="exercise-progress" style="display:none;"></div>
             </div>
 
             <form id="submission-form">

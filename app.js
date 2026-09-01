@@ -1,14 +1,17 @@
 const API_URL = "https://shcool-platform.onrender.com/api";
 
-// Извличане на assignment_id от URL (напр. ?id=123)
+// Извличане на assignment_id (?id=123) или клас за свободно качване на упражнения
+// (?exercise=8a) от URL - двата режима споделят една и съща страница/форма
 const urlParams = new URLSearchParams(window.location.search);
 const assignmentId = urlParams.get('id');
+const exerciseClassId = urlParams.get('exercise');
+const pageMode = assignmentId ? 'assignment' : (exerciseClassId ? 'exercise' : null);
 
 let selectedFile = null;
 let assignmentData = null;
 
 document.addEventListener("DOMContentLoaded", () => {
-    loadAssignment();
+    loadPageContext();
     setupDragAndDrop();
     setupSubmissionForm();
 });
@@ -19,14 +22,16 @@ function showAlert(message) {
     alertBox.style.display = "block";
 }
 
+function loadPageContext() {
+    if (pageMode === 'assignment') return loadAssignment();
+    if (pageMode === 'exercise') return loadExerciseClass();
+
+    showAlert("Липсва линк към задача или клас. Помолете учителя за индивидуалния линк.");
+    document.getElementById("submission-form").style.display = "none";
+}
+
 // Зареждане на информацията за задачата (клас, критерии) и списъка с ученици
 async function loadAssignment() {
-    if (!assignmentId) {
-        showAlert("Липсва линк към задача. Помолете учителя за индивидуалния линк на задачата.");
-        document.getElementById("submission-form").style.display = "none";
-        return;
-    }
-
     try {
         const res = await fetch(`${API_URL}/assignments/${encodeURIComponent(assignmentId)}`);
         if (!res.ok) throw new Error("Задачата не е намерена. Проверете дали линкът е коректен.");
@@ -36,19 +41,43 @@ async function loadAssignment() {
         const subtitle = document.getElementById("assignment-subtitle");
         subtitle.textContent = `Задача: ${assignmentData.title} · Клас: ${assignmentData.group_name || assignmentData.group_id}`;
 
-        const select = document.getElementById("student-select");
-        if (assignmentData.students && Array.isArray(assignmentData.students)) {
-            assignmentData.students.forEach(studentName => {
-                const opt = document.createElement("option");
-                opt.value = studentName;
-                opt.textContent = studentName;
-                select.appendChild(opt);
-            });
-        }
+        populateStudentSelect(assignmentData.students);
     } catch (err) {
         console.error("Грешка при зареждане на задачата:", err);
         showAlert(err.message || "Грешка при зареждане на задачата.");
         document.getElementById("submission-form").style.display = "none";
+    }
+}
+
+// Зареждане на класа за свободно качване на упражнения (без критерии/оценяване)
+async function loadExerciseClass() {
+    try {
+        const res = await fetch(`${API_URL}/groups/${encodeURIComponent(exerciseClassId)}`);
+        if (!res.ok) throw new Error("Класът не е намерен. Проверете дали линкът е коректен.");
+
+        assignmentData = await res.json();
+
+        document.getElementById("assignment-subtitle").textContent =
+            `Качване на упражнение · Клас: ${assignmentData.group_name || assignmentData.group_id} · 5 качвания = оценка Отличен`;
+        document.getElementById("submit-btn").innerHTML = `<i class="fa-solid fa-paper-plane"></i> Качи упражнението`;
+
+        populateStudentSelect(assignmentData.students);
+    } catch (err) {
+        console.error("Грешка при зареждане на класа:", err);
+        showAlert(err.message || "Грешка при зареждане на класа.");
+        document.getElementById("submission-form").style.display = "none";
+    }
+}
+
+function populateStudentSelect(students) {
+    const select = document.getElementById("student-select");
+    if (students && Array.isArray(students)) {
+        students.forEach(studentName => {
+            const opt = document.createElement("option");
+            opt.value = studentName;
+            opt.textContent = studentName;
+            select.appendChild(opt);
+        });
     }
 }
 
@@ -114,17 +143,23 @@ function setupSubmissionForm() {
         const submitBtn = document.getElementById("submit-btn");
         const originalBtnHtml = submitBtn.innerHTML;
         submitBtn.disabled = true;
-        submitBtn.innerHTML = `<i class="fa-solid fa-spinner fa-spin"></i> Проверка на файла...`;
+        submitBtn.innerHTML = pageMode === 'exercise'
+            ? `<i class="fa-solid fa-spinner fa-spin"></i> Качване...`
+            : `<i class="fa-solid fa-spinner fa-spin"></i> Проверка на файла...`;
 
         const formData = new FormData();
         formData.append("class_id", assignmentData.group_id);
         formData.append("student_name", studentName);
-        formData.append("criteria_json", JSON.stringify(assignmentData.criteria || {}));
-        formData.append("assignment_id", assignmentId);
         formData.append("file", selectedFile);
 
+        const endpoint = pageMode === 'exercise' ? '/exercise/upload' : '/evaluate';
+        if (pageMode === 'assignment') {
+            formData.append("criteria_json", JSON.stringify(assignmentData.criteria || {}));
+            formData.append("assignment_id", assignmentId);
+        }
+
         try {
-            const res = await fetch(`${API_URL}/evaluate`, {
+            const res = await fetch(`${API_URL}${endpoint}`, {
                 method: "POST",
                 body: formData
             });
@@ -135,7 +170,11 @@ function setupSubmissionForm() {
             }
 
             const result = await res.json();
-            showResult(result);
+            if (pageMode === 'exercise') {
+                showExerciseResult(result);
+            } else {
+                showResult(result);
+            }
         } catch (err) {
             alert("Грешка при предаването: " + err.message);
             submitBtn.disabled = false;
@@ -162,6 +201,35 @@ function showResult(result) {
     } else {
         gradeEl.style.display = "none";
     }
+
+    document.getElementById("result-panel").style.display = "block";
+}
+
+// Резултатен панел за свободно качване на упражнение (без критерии/точки)
+function showExerciseResult(result) {
+    document.getElementById("submission-form").style.display = "none";
+    document.getElementById("page-alert").style.display = "none";
+
+    document.getElementById("result-title").textContent = result.excellent
+        ? "Упражнението е качено! Достигнахте 5 качвания."
+        : "Упражнението е качено успешно!";
+    document.getElementById("result-filename").textContent = result.filename || "";
+    document.getElementById("result-score-row").style.display = "none";
+
+    const gradeEl = document.getElementById("result-grade");
+    if (result.excellent) {
+        gradeEl.className = "badge-status grade-badge grade-high";
+        gradeEl.textContent = "Оценка: 6 (Отличен)";
+        gradeEl.style.display = "inline-flex";
+    } else {
+        gradeEl.style.display = "none";
+    }
+
+    const progressEl = document.getElementById("result-exercise-progress");
+    progressEl.textContent = result.excellent
+        ? `Качени упражнения: ${result.count} / 5`
+        : `Качени упражнения: ${result.count} / 5 · Още ${result.remaining} до оценка Отличен`;
+    progressEl.style.display = "block";
 
     document.getElementById("result-panel").style.display = "block";
 }

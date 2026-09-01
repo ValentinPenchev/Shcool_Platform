@@ -653,6 +653,69 @@ body {
     font-weight: 600;
 }
 
+/* Бърз достъп до класовете чрез цветни бутони вместо падащо меню */
+.class-chip-row {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+    margin: 8px 0 16px;
+}
+
+.class-chip {
+    border: 1px solid transparent;
+    border-radius: 999px;
+    padding: 7px 16px;
+    font-size: 13px;
+    font-weight: 600;
+    cursor: pointer;
+    background: #f1f5f9;
+    color: var(--text-muted);
+    transition: filter 0.15s ease;
+}
+
+.class-chip:hover {
+    filter: brightness(0.96);
+}
+
+.class-chip.c0 { background: #eff6ff; color: var(--primary-blue); }
+.class-chip.c1 { background: #f0fdf4; color: #16a34a; }
+.class-chip.c2 { background: #fff7ed; color: #ea580c; }
+.class-chip.c3 { background: #f5f3ff; color: #7c3aed; }
+.class-chip.c4 { background: #fef2f2; color: #dc2626; }
+
+.class-chip.active {
+    background: var(--primary-blue);
+    color: #fff;
+}
+
+/* Прогрес лента за упражненията (напр. 3/5 качвания) */
+.progress-bar-track {
+    width: 100px;
+    height: 6px;
+    border-radius: 999px;
+    background: #e2e8f0;
+    display: inline-block;
+    vertical-align: middle;
+    margin-right: 8px;
+}
+
+.progress-bar-fill {
+    height: 100%;
+    border-radius: 999px;
+    background: var(--primary-blue);
+}
+
+.progress-bar-fill.complete {
+    background: #16a34a;
+}
+
+.exercise-progress {
+    margin-top: 10px;
+    font-size: 13px;
+    color: var(--text-muted);
+    font-weight: 600;
+}
+
 .grade-badge.grade-high {
     background: var(--badge-green-bg);
     color: var(--badge-green-text);

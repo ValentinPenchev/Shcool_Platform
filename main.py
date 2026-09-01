@@ -347,6 +347,8 @@ async def delete_submission(submission_id: int):
 # автоматично оценка "Отличен" (6), изчислена винаги от текущия брой записи,
 # а не пазена отделно, за да няма разминаване при изтриване на качване.
 EXCELLENT_UPLOAD_THRESHOLD = 5
+EXCELLENT_GRADE = 6
+EXCELLENT_GRADE_LABEL = "Отличен"
 
 @app.get("/api/groups/{group_id}")
 async def get_group_public(group_id: str):
@@ -425,3 +427,69 @@ async def delete_exercise_upload(upload_id: int):
         return {"status": "success", "message": f"Качването {upload_id} е изтрито."}
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Грешка при изтриване: {str(e)}")
+
+@app.get("/api/admin/exercise-grades")
+async def get_exercise_grades(group_id: Optional[str] = None):
+    try:
+        query = supabase.table("exercise_grade_log").select("*")
+        if group_id:
+            query = query.eq("class_id", group_id)
+        res = query.order("entered_at", desc=True).execute()
+        return res.data or []
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Грешка при четене на въведените оценки: {str(e)}")
+
+@app.post("/api/admin/exercises/mark-graded")
+async def mark_exercise_batch_graded(
+    class_id: str = Form(...),
+    student_name: str = Form(...)
+):
+    """
+    Взима най-старите 5 (все още неотбелязани) качвания на ученика, трайно записва
+    оценката в exercise_grade_log (с имената на файловете за архив), след което
+    трие тези 5 качвания от exercise_uploads (файл + запис), за да не се трупат
+    безкрайно в базата и Storage.
+    """
+    res = supabase.table("exercise_uploads").select("*") \
+        .eq("class_id", class_id).eq("student_name", student_name) \
+        .order("created_at", desc=False).execute()
+    uploads = res.data or []
+
+    if len(uploads) < EXCELLENT_UPLOAD_THRESHOLD:
+        raise HTTPException(
+            status_code=400,
+            detail=f"Няма достатъчно качвания за въвеждане на оценка ({len(uploads)}/{EXCELLENT_UPLOAD_THRESHOLD})."
+        )
+
+    batch = uploads[:EXCELLENT_UPLOAD_THRESHOLD]
+    filenames = [u.get("filename") for u in batch]
+    ids_to_delete = [u["id"] for u in batch]
+    paths_to_delete = [u["storage_path"] for u in batch if u.get("storage_path")]
+
+    try:
+        supabase.table("exercise_grade_log").insert({
+            "class_id": class_id,
+            "student_name": student_name,
+            "grade": EXCELLENT_GRADE,
+            "filenames": filenames
+        }).execute()
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Грешка при записване на оценката: {str(e)}")
+
+    if paths_to_delete:
+        try:
+            supabase.storage.from_(BUCKET_NAME).remove(paths_to_delete)
+        except Exception as e:
+            print(f"Забележка при изтриване на файловете от Storage: {e}")
+
+    supabase.table("exercise_uploads").delete().in_("id", ids_to_delete).execute()
+
+    remaining_res = supabase.table("exercise_uploads").select("id") \
+        .eq("class_id", class_id).eq("student_name", student_name).execute()
+
+    return {
+        "status": "success",
+        "grade": EXCELLENT_GRADE,
+        "grade_label": EXCELLENT_GRADE_LABEL,
+        "remaining_uploads": len(remaining_res.data or [])
+    }

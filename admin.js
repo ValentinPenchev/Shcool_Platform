@@ -807,7 +807,9 @@ function exportSubmissionsCSV() {
 // -----------------------------------------------------------------------------
 
 const EXCELLENT_UPLOAD_THRESHOLD = 5;
+const EXCELLENT_GRADE_VALUE = 6;
 let exercisesCache = [];
+let exerciseGradesCache = [];
 
 function buildExerciseLink(classId) {
     return `${window.location.origin}${getSiteBasePath()}index.html?exercise=${encodeURIComponent(classId)}`;
@@ -824,7 +826,21 @@ function copyExerciseLink() {
     });
 }
 
-// Зарежда всички качвания за избрания клас и обновява линк-картата и таблицата
+// Разбива списък на последователни групи по `size` елемента (за групиране по 5 качвания)
+function chunkIntoBatches(list, size) {
+    const batches = [];
+    for (let i = 0; i < list.length; i += size) {
+        batches.push(list.slice(i, i + size));
+    }
+    return batches;
+}
+
+// Обезопасява текст за вграждане в единични кавички вътре в onclick="" атрибут
+function escapeJsString(str) {
+    return String(str).replace(/\\/g, '\\\\').replace(/'/g, "\\'");
+}
+
+// Зарежда качванията + вече въведените оценки за избрания клас и обновява таблицата
 async function loadExercisesData() {
     const classId = document.getElementById("exercise-class-filter").value;
     const linkCard = document.getElementById("exercises-link-card");
@@ -833,7 +849,7 @@ async function loadExercisesData() {
     if (!classId) {
         linkCard.style.display = "none";
         tbody.innerHTML = `
-            <tr><td colspan="5">
+            <tr><td colspan="4">
                 <div class="empty-state">
                     <div class="empty-icon"><i class="fa-solid fa-user-group"></i></div>
                     <h4>Изберете клас</h4>
@@ -850,41 +866,52 @@ async function loadExercisesData() {
     linkCard.style.display = "flex";
 
     try {
-        const res = await fetch(`${API_URL}/admin/exercises?group_id=${encodeURIComponent(classId)}`);
-        if (!res.ok) throw new Error("Грешка при заявката към сървъра");
-        exercisesCache = await res.json();
+        const [uploadsRes, gradesRes] = await Promise.all([
+            fetch(`${API_URL}/admin/exercises?group_id=${encodeURIComponent(classId)}`),
+            fetch(`${API_URL}/admin/exercise-grades?group_id=${encodeURIComponent(classId)}`)
+        ]);
+        if (!uploadsRes.ok || !gradesRes.ok) throw new Error("Грешка при заявката към сървъра");
+        exercisesCache = await uploadsRes.json();
+        exerciseGradesCache = await gradesRes.json();
         renderExercisesTable(classId);
     } catch (err) {
         console.error("Грешка при зареждане на упражненията:", err);
         tbody.innerHTML = `
-            <tr><td colspan="5">
+            <tr><td colspan="4">
                 <div class="empty-state">
                     <div class="empty-icon"><i class="fa-solid fa-triangle-exclamation"></i></div>
                     <h4>Грешка при зареждане</h4>
-                    <p>Уверете се, че таблицата "exercise_uploads" съществува в Supabase.</p>
+                    <p>Уверете се, че таблиците "exercise_uploads" и "exercise_grade_log" съществуват в Supabase.</p>
                 </div>
             </td></tr>
         `;
     }
 }
 
-// Групира качванията по ученик и рендва обобщената таблица с напредък
+// Групира качванията по ученик (и по групи от 5) и рендва таблицата с напредък
 function renderExercisesTable(classId) {
     const tbody = document.querySelector("#exercises-table tbody");
     const students = (classesData[classId] && classesData[classId].students) || [];
 
-    const byStudent = {};
-    students.forEach(name => { byStudent[name] = []; });
+    const uploadsByStudent = {};
+    students.forEach(name => { uploadsByStudent[name] = []; });
     exercisesCache.forEach(upload => {
         const name = upload.student_name || "Неизвестен";
-        if (!byStudent[name]) byStudent[name] = [];
-        byStudent[name].push(upload);
+        if (!uploadsByStudent[name]) uploadsByStudent[name] = [];
+        uploadsByStudent[name].push(upload);
     });
 
-    const names = Object.keys(byStudent);
+    const gradesByStudent = {};
+    exerciseGradesCache.forEach(g => {
+        const name = g.student_name || "Неизвестен";
+        if (!gradesByStudent[name]) gradesByStudent[name] = [];
+        gradesByStudent[name].push(g);
+    });
+
+    const names = Array.from(new Set([...students, ...Object.keys(uploadsByStudent), ...Object.keys(gradesByStudent)]));
     if (names.length === 0) {
         tbody.innerHTML = `
-            <tr><td colspan="5">
+            <tr><td colspan="4">
                 <div class="empty-state">
                     <div class="empty-icon"><i class="fa-solid fa-inbox"></i></div>
                     <h4>Няма ученици в този клас</h4>
@@ -895,42 +922,87 @@ function renderExercisesTable(classId) {
     }
 
     tbody.innerHTML = names.map((name, index) => {
-        const uploads = byStudent[name].slice().sort((a, b) => new Date(b.created_at || 0) - new Date(a.created_at || 0));
-        const count = uploads.length;
-        const isExcellent = count >= EXCELLENT_UPLOAD_THRESHOLD;
-        const pct = Math.min(100, Math.round((count / EXCELLENT_UPLOAD_THRESHOLD) * 100));
+        const uploads = (uploadsByStudent[name] || []).slice().sort((a, b) => new Date(a.created_at || 0) - new Date(b.created_at || 0));
+        const grades = (gradesByStudent[name] || []).slice().sort((a, b) => new Date(a.entered_at || 0) - new Date(b.entered_at || 0));
+        const batches = chunkIntoBatches(uploads, EXCELLENT_UPLOAD_THRESHOLD);
+        const readyBatches = batches.filter(b => b.length === EXCELLENT_UPLOAD_THRESHOLD);
+        const inProgressBatch = batches.find(b => b.length < EXCELLENT_UPLOAD_THRESHOLD);
+        const inProgressCount = inProgressBatch ? inProgressBatch.length : 0;
+        const hasReady = readyBatches.length > 0;
         const rowId = `exercise-student-${index}`;
+        const safeName = escapeJsString(name);
 
-        const gradeCell = isExcellent
-            ? `<span class="badge-status grade-badge grade-high">6 (Отличен)</span>`
-            : '—';
+        const gradedBadge = grades.length > 0
+            ? `<span class="badge-status grade-badge grade-high"><i class="fa-solid fa-circle-check"></i> ${grades.length} ${grades.length === 1 ? 'въведена' : 'въведени'}</span>`
+            : '<span class="stat-sub">Няма</span>';
 
-        const detailRows = uploads.length === 0
-            ? `<div class="submission-detail-empty">Няма качени упражнения все още.</div>`
-            : `<ul class="missed-criteria-list">${uploads.map(u => `
-                <li>
-                    <i class="fa-regular fa-file-lines"></i> ${u.filename || 'Файл'} · ${formatSubmittedAt(u.created_at)}
-                    ${u.file_url && u.file_url !== '#' ? `<a href="${u.file_url}" target="_blank" rel="noopener" class="btn-icon" title="Отвори"><i class="fa-regular fa-eye"></i></a>` : ''}
-                    <button type="button" class="btn-danger-icon" onclick="event.stopPropagation(); deleteExerciseUpload(${u.id}, '${classId}')" title="Изтрий качването"><i class="fa-regular fa-trash-can"></i></button>
-                </li>
-              `).join('')}</ul>`;
+        // Единна индикация за оценка: докато не е готова (< 5 качвания) е прогрес лента;
+        // щом стигне 5, самата индикация става кликаема (кехлибарена) - при клик трайно
+        // се записва и остава зелена ("въведена"), вместо отделен бутон до нея.
+        const gradeIndicatorCell = hasReady
+            ? gradeIndicator(classId, safeName, 'pending')
+            : `<div class="progress-bar-track"><div class="progress-bar-fill" style="width:${Math.round((inProgressCount / EXCELLENT_UPLOAD_THRESHOLD) * 100)}%"></div></div><span class="stat-sub">${inProgressCount} / ${EXCELLENT_UPLOAD_THRESHOLD}</span>`;
+
+        const historyHtml = grades.map(g => `
+            <div class="exercise-batch-card entered">
+                <div class="batch-card-header">
+                    ${gradeIndicator(classId, safeName, 'entered')}
+                    <span class="stat-sub">въведена на ${formatSubmittedAt(g.entered_at)}</span>
+                </div>
+                <ul class="missed-criteria-list">
+                    ${(g.filenames || []).map(f => `<li><i class="fa-regular fa-file-lines"></i> ${f}</li>`).join('')}
+                </ul>
+            </div>
+        `).join('');
+
+        const currentBatchesHtml = batches.map(batch => {
+            const isReady = batch.length === EXCELLENT_UPLOAD_THRESHOLD;
+            return `
+                <div class="exercise-batch-card ${isReady ? 'pending' : 'progress'}">
+                    <div class="batch-card-header">
+                        ${isReady
+                            ? gradeIndicator(classId, safeName, 'pending')
+                            : `<span class="stat-sub">В процес: ${batch.length} / ${EXCELLENT_UPLOAD_THRESHOLD}</span>`}
+                    </div>
+                    <ul class="missed-criteria-list">
+                        ${batch.map(u => `
+                            <li>
+                                <i class="fa-regular fa-file-lines"></i> ${u.filename || 'Файл'} · ${formatSubmittedAt(u.created_at)}
+                                ${u.file_url && u.file_url !== '#' ? `<a href="${u.file_url}" target="_blank" rel="noopener" class="btn-icon" title="Отвори"><i class="fa-regular fa-eye"></i></a>` : ''}
+                                <button type="button" class="btn-danger-icon" onclick="event.stopPropagation(); deleteExerciseUpload(${u.id}, '${classId}')" title="Изтрий качването"><i class="fa-regular fa-trash-can"></i></button>
+                            </li>
+                        `).join('')}
+                    </ul>
+                </div>
+            `;
+        }).join('');
+
+        const detailContent = (historyHtml + currentBatchesHtml) || `<div class="submission-detail-empty">Няма качени упражнения все още.</div>`;
 
         return `
             <tr class="clickable-row" onclick="toggleExerciseDetails('${rowId}')">
                 <td><button type="button" class="btn-icon expand-toggle" id="toggle-${rowId}" title="Детайли по качвания"><i class="fa-solid fa-chevron-right"></i></button></td>
                 <td><span class="row-avatar a${index % 5}">${name.slice(0, 1).toUpperCase()}</span><strong>${name}</strong></td>
-                <td>${count}</td>
-                <td>
-                    <div class="progress-bar-track"><div class="progress-bar-fill ${isExcellent ? 'complete' : ''}" style="width:${pct}%"></div></div>
-                    <span class="stat-sub">${Math.min(count, EXCELLENT_UPLOAD_THRESHOLD)} / ${EXCELLENT_UPLOAD_THRESHOLD}</span>
-                </td>
-                <td>${gradeCell}</td>
+                <td>${gradedBadge}</td>
+                <td>${gradeIndicatorCell}</td>
             </tr>
             <tr class="submission-detail-row" id="detail-${rowId}" hidden>
-                <td colspan="5">${detailRows}</td>
+                <td colspan="4">${detailContent}</td>
             </tr>
         `;
     }).join("");
+}
+
+// Единна кликаема/статична индикация за оценка от упражнения. В "pending" състояние е
+// бутон (кехлибарен) - при клик въвежда оценката и трие качванията. В "entered"
+// състояние е статичен елемент (зелен), защото вече е трайно записана в grade log.
+function gradeIndicator(classId, safeName, state) {
+    if (state === 'entered') {
+        return `<span class="grade-indicator entered"><i class="fa-solid fa-star"></i> ${EXCELLENT_GRADE_VALUE} (Отличен)</span>`;
+    }
+    return `<button type="button" class="grade-indicator pending" onclick="event.stopPropagation(); markExerciseGraded('${classId}', '${safeName}')" title="Цъкни, за да въведеш оценката">
+        <i class="fa-regular fa-star"></i> ${EXCELLENT_GRADE_VALUE} (Отличен)
+    </button>`;
 }
 
 function toggleExerciseDetails(rowId) {
@@ -951,9 +1023,43 @@ async function deleteExerciseUpload(uploadId, classId) {
             throw new Error(errData.detail || `HTTP грешка: ${response.status}`);
         }
 
-        exercisesCache = exercisesCache.filter(u => u.id !== uploadId);
-        renderExercisesTable(classId);
+        await loadExercisesData();
     } catch (err) {
         alert("Грешка при изтриване на качването: " + err.message);
+    }
+}
+
+// Пази кои ученици в момента имат заявка за въвеждане на оценка "в полет", за да не
+// се задейства двоен submit при бърз двоен клик преди таблицата да се презареди
+const exerciseGradingInFlight = new Set();
+
+// Отбелязва най-старите 5 качвания на ученика като изведени с оценка Отличен -
+// сървърът трайно записва оценката (с имената на файловете) и трие тези 5 качвания
+async function markExerciseGraded(classId, studentName) {
+    const key = `${classId}|${studentName}`;
+    if (exerciseGradingInFlight.has(key)) return;
+    if (!confirm(`Да се въведе оценка ${EXCELLENT_GRADE_VALUE} (Отличен) за "${studentName}" и да се изтрият тези 5 качвания?`)) return;
+
+    exerciseGradingInFlight.add(key);
+    try {
+        const formData = new FormData();
+        formData.append("class_id", classId);
+        formData.append("student_name", studentName);
+
+        const response = await fetch(`${API_URL}/admin/exercises/mark-graded`, {
+            method: "POST",
+            body: formData
+        });
+
+        if (!response.ok) {
+            const errData = await response.json().catch(() => ({}));
+            throw new Error(errData.detail || `HTTP грешка: ${response.status}`);
+        }
+
+        await loadExercisesData();
+    } catch (err) {
+        alert("Грешка при въвеждане на оценката: " + err.message);
+    } finally {
+        exerciseGradingInFlight.delete(key);
     }
 }

@@ -30,6 +30,22 @@ app.add_middleware(
 CLEANUP_AFTER_DAYS = 60
 CLEANUP_INTERVAL_SECONDS = 24 * 60 * 60
 
+# Стандартна българска скала за оценяване (2-6), изведена от процента успех.
+# Оценката не се пази отделно в базата - винаги се извежда от вече записания
+# процент, за да не се налага промяна на схемата на submissions.
+def _percentage_to_grade(percentage: float) -> dict:
+    if percentage >= 91:
+        grade, label = 6, "Отличен"
+    elif percentage >= 76:
+        grade, label = 5, "Много добър"
+    elif percentage >= 61:
+        grade, label = 4, "Добър"
+    elif percentage >= 41:
+        grade, label = 3, "Среден"
+    else:
+        grade, label = 2, "Слаб"
+    return {"grade": grade, "grade_label": label}
+
 async def periodic_cleanup():
     while True:
         try:
@@ -247,6 +263,7 @@ async def evaluate_file(
         raise HTTPException(status_code=400, detail="Форматът не се поддържа.")
 
     percentage = round((result["score"] / result["max_score"] * 100), 1) if result["max_score"] > 0 else 0
+    grade_info = _percentage_to_grade(percentage)
 
     # Забележка: таблицата submissions няма собствена колона assignment_id, затова
     # го пазим вътре в details_json (вече съществуваща JSON колона), за да не се
@@ -278,6 +295,8 @@ async def evaluate_file(
         "score": result["score"],
         "max_score": result["max_score"],
         "percentage": percentage,
+        "grade": grade_info["grade"],
+        "grade_label": grade_info["grade_label"],
         "details": result["details"]
     }
 
@@ -294,6 +313,9 @@ async def get_submissions(group_id: Optional[str] = None, assignment_id: Optiona
         for row in rows:
             details = row.get("details_json")
             row["assignment_id"] = details.get("assignment_id") if isinstance(details, dict) else None
+            grade_info = _percentage_to_grade(row.get("percentage") or 0)
+            row["grade"] = grade_info["grade"]
+            row["grade_label"] = grade_info["grade_label"]
 
         if assignment_id:
             rows = [r for r in rows if r.get("assignment_id") == assignment_id]

@@ -9,6 +9,10 @@
     --card-bg: #ffffff;
     --badge-green-bg: #dcfce7;
     --badge-green-text: #166534;
+    --badge-amber-bg: #fef3c7;
+    --badge-amber-text: #92400e;
+    --badge-red-bg: #fee2e2;
+    --badge-red-text: #991b1b;
     --word-color: #0284c7;
     --excel-color: #16a34a;
     --ppt-color: #ea580c;
@@ -647,6 +651,73 @@ body {
     color: var(--badge-green-text);
     font-size: 12px;
     font-weight: 600;
+}
+
+.grade-badge.grade-high {
+    background: var(--badge-green-bg);
+    color: var(--badge-green-text);
+}
+
+.grade-badge.grade-mid {
+    background: var(--badge-amber-bg);
+    color: var(--badge-amber-text);
+}
+
+.grade-badge.grade-low {
+    background: var(--badge-red-bg);
+    color: var(--badge-red-text);
+}
+
+.grade-badge .grade-label {
+    font-weight: 500;
+    opacity: 0.85;
+}
+
+/* Бутон-стрелка за разгъване на детайли по критерии в таблицата с резултати */
+.expand-toggle i {
+    transition: transform 0.15s ease;
+}
+
+.expand-toggle.expanded i {
+    transform: rotate(90deg);
+}
+
+/* Разгънат ред с пропуснати критерии под реда с резултата */
+.submission-detail-row td {
+    background: #f8fafc;
+    padding: 14px 20px;
+    border-bottom: 1px solid var(--border-color);
+}
+
+.submission-detail-ok {
+    color: var(--badge-green-text);
+    font-weight: 600;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+}
+
+.submission-detail-title {
+    font-weight: 600;
+    margin-bottom: 6px;
+    color: var(--text-muted);
+}
+
+.missed-criteria-list {
+    margin: 0;
+    padding-left: 20px;
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+}
+
+.missed-criteria-list li {
+    font-size: 13px;
+}
+
+.submission-detail-empty {
+    color: var(--text-muted);
+    font-style: italic;
 }
 
 /* Аватар с инициал за ред в таблица (ученици, резултати) */

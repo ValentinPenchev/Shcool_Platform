@@ -153,5 +153,15 @@ function showResult(result) {
     document.getElementById("result-max-score").textContent = result.max_score ?? 0;
     document.getElementById("result-percentage").textContent = `${result.percentage ?? 0}%`;
 
+    const gradeEl = document.getElementById("result-grade");
+    if (result.grade) {
+        const tier = result.grade >= 5 ? "grade-high" : (result.grade === 4 ? "grade-mid" : "grade-low");
+        gradeEl.className = `badge-status grade-badge ${tier}`;
+        gradeEl.textContent = `Оценка: ${result.grade} (${result.grade_label || ""})`;
+        gradeEl.style.display = "inline-flex";
+    } else {
+        gradeEl.style.display = "none";
+    }
+
     document.getElementById("result-panel").style.display = "block";
 }

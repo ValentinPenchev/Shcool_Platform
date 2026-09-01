@@ -556,7 +556,7 @@ function renderSubmissionsTable() {
 
     if (filtered.length === 0) {
         tbody.innerHTML = `
-            <tr><td colspan="8">
+            <tr><td colspan="10">
                 <div class="empty-state">
                     <div class="empty-icon"><i class="fa-solid fa-inbox"></i></div>
                     <h4>Няма предадени решения</h4>
@@ -585,22 +585,64 @@ function renderSubmissionsTable() {
                 <a href="${sub.file_url}" download="${sub.filename || ''}" class="btn-icon" title="Свали материала"><i class="fa-solid fa-download"></i></a>
               `
             : '<span class="stat-sub">Няма файл</span>';
+        const gradeTier = sub.grade >= 5 ? 'grade-high' : (sub.grade === 4 ? 'grade-mid' : 'grade-low');
+        const gradeCell = sub.grade
+            ? `<span class="badge-status grade-badge ${gradeTier}">${sub.grade} <span class="grade-label">(${sub.grade_label || ''})</span></span>`
+            : '—';
+        const detailRowId = `sub-detail-${sub.id}`;
 
         return `
-            <tr>
+            <tr class="clickable-row" onclick="toggleSubmissionDetails(${sub.id})">
+                <td><button type="button" class="btn-icon expand-toggle" id="toggle-${sub.id}" title="Детайли по критерии"><i class="fa-solid fa-chevron-right"></i></button></td>
                 <td>${index + 1}</td>
                 <td><span class="row-avatar a${index % 5}">${studentName.slice(0, 1).toUpperCase()}</span><strong>${studentName}</strong></td>
                 <td>${taskTitle}</td>
                 <td><div class="file-name-cell"><i class="fa-regular fa-file-lines"></i>${sub.filename || sub.file_name || 'Файл'}</div></td>
                 <td>${submittedAt}</td>
                 <td><strong>${sub.score || 0}</strong> / ${sub.max_score || 100} точки</td>
+                <td>${gradeCell}</td>
                 <td><span class="badge-status">${statusBadge}</span></td>
-                <td>${fileActions}<button type="button" class="btn-danger-icon" onclick="deleteSubmission(${sub.id})" title="Изтрий предаването"><i class="fa-regular fa-trash-can"></i></button></td>
+                <td onclick="event.stopPropagation();">${fileActions}<button type="button" class="btn-danger-icon" onclick="deleteSubmission(${sub.id})" title="Изтрий предаването"><i class="fa-regular fa-trash-can"></i></button></td>
+            </tr>
+            <tr class="submission-detail-row" id="${detailRowId}" hidden>
+                <td colspan="10">${buildSubmissionDetailsHtml(sub)}</td>
             </tr>
         `;
     }).join("");
 
     renderSubmissionsPagination(filtered.length);
+}
+
+// Изгражда съдържанието на разширения ред: какво е пропуснато от критериите
+function buildSubmissionDetailsHtml(sub) {
+    const details = sub.details_json && Array.isArray(sub.details_json.details) ? sub.details_json.details : null;
+
+    if (!details) {
+        return '<div class="submission-detail-empty">Няма налична информация по критериите за това предаване.</div>';
+    }
+
+    const missed = details.filter(d => !d.passed);
+
+    if (missed.length === 0) {
+        return `<div class="submission-detail-ok"><i class="fa-solid fa-circle-check"></i> Всичко е изпълнено</div>`;
+    }
+
+    const items = missed.map(d => `<li><strong>${d.criterion || 'Критерий'}:</strong> ${d.note || 'Не е изпълнено.'}</li>`).join('');
+    return `
+        <div class="submission-detail-missed">
+            <div class="submission-detail-title">Пропуснато от критериите:</div>
+            <ul class="missed-criteria-list">${items}</ul>
+        </div>
+    `;
+}
+
+// Разгъва/свива реда с детайли по критерии за дадено предаване
+function toggleSubmissionDetails(submissionId) {
+    const row = document.getElementById(`sub-detail-${submissionId}`);
+    const toggleBtn = document.getElementById(`toggle-${submissionId}`);
+    if (!row) return;
+    row.hidden = !row.hidden;
+    if (toggleBtn) toggleBtn.classList.toggle('expanded', !row.hidden);
 }
 
 // Форматира датата на предаване като дд/мм/гггг чч:мм

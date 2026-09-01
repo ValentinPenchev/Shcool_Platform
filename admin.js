@@ -1,5 +1,60 @@
 const API_URL = "https://shcool-platform.onrender.com/api";
 
+// Дискретни изскачащи съобщения вместо блокиращи alert() диалози
+function showToast(message, type = "info") {
+    let container = document.getElementById("toast-container");
+    if (!container) {
+        container = document.createElement("div");
+        container.id = "toast-container";
+        container.className = "toast-container";
+        document.body.appendChild(container);
+    }
+    const icons = {
+        success: "fa-circle-check",
+        error: "fa-circle-exclamation",
+        warning: "fa-triangle-exclamation",
+        info: "fa-circle-info"
+    };
+    const toast = document.createElement("div");
+    toast.className = `toast ${type}`;
+    toast.innerHTML = `<i class="fa-solid ${icons[type] || icons.info}"></i><span>${message}</span>`;
+    container.appendChild(toast);
+    setTimeout(() => {
+        toast.classList.add("hide");
+        setTimeout(() => toast.remove(), 250);
+    }, 4000);
+}
+
+// Тъмна тема - предпочитанието се пази локално във всеки браузър (localStorage)
+function applyTheme(theme) {
+    document.documentElement.setAttribute("data-theme", theme);
+    const icon = document.getElementById("theme-toggle-icon");
+    const label = document.getElementById("theme-toggle-label");
+    if (icon) icon.className = theme === "dark" ? "fa-solid fa-sun" : "fa-solid fa-moon";
+    if (label) label.textContent = theme === "dark" ? "Светла тема" : "Тъмна тема";
+}
+
+function toggleTheme() {
+    const current = document.documentElement.getAttribute("data-theme") === "dark" ? "dark" : "light";
+    const next = current === "dark" ? "light" : "dark";
+    try {
+        localStorage.setItem("vpclassroom-theme", next);
+    } catch (err) {
+        console.warn("Не може да се запази предпочитанието за тема:", err);
+    }
+    applyTheme(next);
+}
+
+(function initTheme() {
+    let saved = "light";
+    try {
+        saved = localStorage.getItem("vpclassroom-theme") || "light";
+    } catch (err) {
+        console.warn("Не може да се прочете предпочитанието за тема:", err);
+    }
+    applyTheme(saved);
+})();
+
 document.addEventListener("DOMContentLoaded", async () => {
     // Изчакваме класовете и задачите, за да са налични имената им (напр. в колоната "Задача"),
     // преди първото зареждане на статистиката
@@ -259,7 +314,7 @@ async function deleteClass(classId) {
 
         loadAssignments();
     } catch (err) {
-        alert("Грешка при изтриване на класа: " + err.message);
+        showToast("Грешка при изтриване на класа: " + err.message, "error");
     }
 }
 
@@ -354,7 +409,7 @@ function renderAssignmentRow(a) {
 function copyAssignmentLink(assignmentId) {
     const url = buildStudentLink(assignmentId);
     navigator.clipboard?.writeText(url).then(() => {
-        alert("Линкът е копиран: " + url);
+        showToast("Линкът е копиран.", "success");
     }).catch(() => {
         prompt("Копирайте линка ръчно:", url);
     });
@@ -370,7 +425,7 @@ async function deleteAssignment(assignmentId) {
         document.getElementById(`assignment-row-${assignmentId}`)?.remove();
         document.querySelector(`#filter-assignment option[value="${assignmentId}"]`)?.remove();
     } catch (err) {
-        alert("Грешка при изтриване на задачата: " + err.message);
+        showToast("Грешка при изтриване на задачата: " + err.message, "error");
     }
 }
 
@@ -380,13 +435,32 @@ function filterAssignmentsTable() {
     loadAssignments(selectedClass);
 }
 
+// Разчита списък с ученици, поставен директно от електронен дневник - премахва
+// водещ номер/индекс на реда ("1.", "1)", "№", таб-разделена номерирана колона)
+// и прескача редове, съдържащи само заглавие на колона (напр. "№  Име Фамилия")
+const ROSTER_HEADER_WORDS = new Set(["№", "no", "name", "име", "имена", "ученик", "ученици", "фамилия"]);
+
+function parseStudentRoster(text) {
+    return text.split("\n")
+        .map(line => line.trim())
+        .filter(line => line.length > 0)
+        .map(line => line.replace(/^(?:№\s*|\d+\s*[.)\-:]?\s*)/, "").replace(/\t+/g, " ").trim())
+        .filter(name => {
+            if (!name) return false;
+            // Пропуска редове, съставени изцяло от заглавни думи (напр. "Име, Фамилия")
+            const tokens = name.toLowerCase().split(/[^a-zа-я]+/).filter(Boolean);
+            const isHeaderOnly = tokens.length > 0 && tokens.every(t => ROSTER_HEADER_WORDS.has(t));
+            return !isHeaderOnly;
+        });
+}
+
 // Добавяне/редактиране на клас и мигновено визуализиране
 document.getElementById("create-class-form")?.addEventListener("submit", async (e) => {
     e.preventDefault();
     const id = document.getElementById("class-id").value.trim();
     const name = document.getElementById("class-name").value.trim();
     const studentsText = document.getElementById("class-names-text").value;
-    const studentsArray = studentsText.split("\n").map(s => s.trim()).filter(s => s.length > 0);
+    const studentsArray = parseStudentRoster(studentsText);
 
     if (!editingClassId && classesData[id]) {
         if (!confirm(`Клас с ID "${id}" вече съществува. Искате ли да презапишете данните му?`)) return;
@@ -408,7 +482,7 @@ document.getElementById("create-class-form")?.addEventListener("submit", async (
             throw new Error(errData.detail || `HTTP грешка: ${response.status}`);
         }
 
-        alert(editingClassId ? "Класът е обновен успешно!" : "Класът е запазен успешно в базата данни!");
+        showToast(editingClassId ? "Класът е обновен успешно!" : "Класът е запазен успешно!", "success");
         upsertClassInUI(id, name, studentsArray);
 
         if (editingClassId) {
@@ -417,7 +491,7 @@ document.getElementById("create-class-form")?.addEventListener("submit", async (
             document.getElementById("create-class-form").reset();
         }
     } catch (err) {
-        alert("Грешка при запазване на класа: " + err.message);
+        showToast("Грешка при запазване на класа: " + err.message, "error");
     }
 });
 
@@ -462,13 +536,13 @@ document.getElementById("create-assignment-form")?.addEventListener("submit", as
             throw new Error(errorDetail);
         }
 
-        alert("Задачата е създадена успешно!");
+        showToast("Задачата е създадена успешно!", "success");
         document.getElementById("create-assignment-form").reset();
 
         const currentFilter = document.getElementById("filter-assignments-class").value;
         await loadAssignments(currentFilter);
     } catch (err) {
-        alert("Грешка при създаване на задачата: " + err.message);
+        showToast("Грешка при създаване на задачата: " + err.message, "error");
     }
 });
 
@@ -729,7 +803,7 @@ async function deleteSubmission(submissionId) {
         submissionsCache = submissionsCache.filter(sub => sub.id !== submissionId);
         renderSubmissionsTable();
     } catch (err) {
-        alert("Грешка при изтриване на предаването: " + err.message);
+        showToast("Грешка при изтриване на предаването: " + err.message, "error");
     }
 }
 
@@ -779,18 +853,48 @@ function changeSubmissionsPageSize(size) {
 }
 
 // Експортира текущо филтрираните резултати като CSV файл
+// Резервно изчисление на оценка от процент (сървърът вече винаги я връща, но
+// пази съвместимост при евентуален стар/липсващ отговор)
+function pointsToGrade(percentage) {
+    if (percentage >= 91) return { grade: 6, label: "Отличен" };
+    if (percentage >= 76) return { grade: 5, label: "Много добър" };
+    if (percentage >= 61) return { grade: 4, label: "Добър" };
+    if (percentage >= 41) return { grade: 3, label: "Среден" };
+    return { grade: 2, label: "Слаб" };
+}
+
+// Генерира и сваля CSV файл (отваря се директно в Excel) от подадени заглавия и редове
+function downloadCSV(filenamePrefix, headers, rows) {
+    const csvRows = [headers.join(",")];
+    rows.forEach(row => {
+        const values = row.map(v => `"${String(v ?? "").replace(/"/g, '""')}"`);
+        csvRows.push(values.join(","));
+    });
+
+    // BOM в началото, за да разпознае Excel коректно кирилицата в UTF-8
+    const blob = new Blob(["﻿" + csvRows.join("\n")], { type: "text/csv;charset=utf-8;" });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement("a");
+    link.href = url;
+    link.download = `${filenamePrefix}_${new Date().toISOString().slice(0, 10)}.csv`;
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+    URL.revokeObjectURL(url);
+}
+
 function exportSubmissionsCSV() {
     const rows = getFilteredSubmissions();
     if (rows.length === 0) {
-        alert("Няма данни за експортиране.");
+        showToast("Няма данни за експортиране.", "warning");
         return;
     }
 
-    const headers = ["Ученик", "Задача", "Клас", "Файл", "Предадено на", "Точки", "Максимум точки", "Успех (%)"];
-    const csvRows = [headers.join(",")];
-    rows.forEach(sub => {
+    const headers = ["Ученик", "Задача", "Клас", "Файл", "Предадено на", "Точки", "Максимум точки", "Успех (%)", "Оценка"];
+    const csvRows = rows.map(sub => {
         const taskTitle = assignmentTitleById[sub.assignment_id] || sub.assignment_id || "";
-        const values = [
+        const gradeInfo = pointsToGrade(sub.percentage || 0);
+        return [
             sub.student_name || "",
             taskTitle,
             sub.class_id || "",
@@ -798,20 +902,13 @@ function exportSubmissionsCSV() {
             formatSubmittedAt(sub.created_at),
             sub.score || 0,
             sub.max_score || 0,
-            sub.percentage || 0
-        ].map(v => `"${String(v).replace(/"/g, '""')}"`);
-        csvRows.push(values.join(","));
+            sub.percentage || 0,
+            `${sub.grade ?? gradeInfo.grade} (${sub.grade_label ?? gradeInfo.label})`
+        ];
     });
 
-    const blob = new Blob(["﻿" + csvRows.join("\n")], { type: "text/csv;charset=utf-8;" });
-    const url = URL.createObjectURL(blob);
-    const link = document.createElement("a");
-    link.href = url;
-    link.download = `rezultati_${new Date().toISOString().slice(0, 10)}.csv`;
-    document.body.appendChild(link);
-    link.click();
-    document.body.removeChild(link);
-    URL.revokeObjectURL(url);
+    downloadCSV("rezultati", headers, csvRows);
+    showToast("Резултатите бяха свалени успешно.", "success");
 }
 
 // -----------------------------------------------------------------------------
@@ -832,7 +929,7 @@ function copyExerciseLink(explicitClassId) {
     if (!classId) return;
     const url = buildExerciseLink(classId);
     navigator.clipboard?.writeText(url).then(() => {
-        alert("Линкът е копиран: " + url);
+        showToast("Линкът е копиран.", "success");
     }).catch(() => {
         prompt("Копирайте линка ръчно:", url);
     });
@@ -1046,8 +1143,35 @@ async function deleteExerciseUpload(uploadId, classId) {
 
         await loadExercisesData();
     } catch (err) {
-        alert("Грешка при изтриване на качването: " + err.message);
+        showToast("Грешка при изтриване на качването: " + err.message, "error");
     }
+}
+
+// Експортира трайно въведените оценки от упражнения за текущо избрания клас -
+// удобно за прехвърляне в официалния дневник или Шкколо
+function exportExerciseGradesCSV() {
+    const classId = document.getElementById("exercise-class-filter").value;
+    if (!classId) {
+        showToast("Изберете клас, за да експортирате оценките му.", "warning");
+        return;
+    }
+    if (exerciseGradesCache.length === 0) {
+        showToast("Няма въведени оценки за този клас.", "warning");
+        return;
+    }
+
+    const className = (classesData[classId] && classesData[classId].className) || classId;
+    const headers = ["Ученик", "Клас", "Оценка", "Дата на въвеждане", "Файлове"];
+    const rows = exerciseGradesCache.map(g => [
+        g.student_name || "",
+        className,
+        `${g.grade} (Отличен)`,
+        formatSubmittedAt(g.entered_at),
+        (g.filenames || []).join("; ")
+    ]);
+
+    downloadCSV(`ocenki_uprazhnenia_${classId}`, headers, rows);
+    showToast("Оценките бяха свалени успешно.", "success");
 }
 
 // Пази кои ученици в момента имат заявка за въвеждане на оценка "в полет", за да не
@@ -1079,7 +1203,7 @@ async function markExerciseGraded(classId, studentName) {
 
         await loadExercisesData();
     } catch (err) {
-        alert("Грешка при въвеждане на оценката: " + err.message);
+        showToast("Грешка при въвеждане на оценката: " + err.message, "error");
     } finally {
         exerciseGradingInFlight.delete(key);
     }

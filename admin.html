@@ -23,6 +23,11 @@
                 <li id="menu-exercises"><a href="#" onclick="showSection('exercises')"><i class="fa-solid fa-dumbbell"></i> Упражнения</a></li>
                 <li id="menu-classes"><a href="#" onclick="showSection('classes')"><i class="fa-solid fa-user-group"></i> Ученици</a></li>
             </ul>
+
+            <button type="button" class="theme-toggle-btn" id="theme-toggle-btn" onclick="toggleTheme()">
+                <i class="fa-solid fa-moon" id="theme-toggle-icon"></i>
+                <span id="theme-toggle-label">Тъмна тема</span>
+            </button>
         </aside>
 
         <!-- ОСНОВНО СЪДЪРЖАНИЕ -->
@@ -248,6 +253,7 @@
                 <div class="table-card" style="margin-top: 20px;">
                     <div class="table-card-header">
                         <h3 style="margin:0;">Напредък по ученици</h3>
+                        <button type="button" class="btn-secondary" onclick="exportExerciseGradesCSV()"><i class="fa-solid fa-download"></i> Експорт на оценки</button>
                     </div>
                     <div class="table-responsive">
                         <table class="styled-table" id="exercises-table">
@@ -289,6 +295,7 @@
                             <div class="form-group">
                                 <label>Въвеждане на ученици (всяко име на нов ред)</label>
                                 <textarea id="class-names-text" class="custom-textarea" rows="4" placeholder="Иван Иванов&#10;Мария Петрова&#10;..."></textarea>
+                                <span class="field-hint">Може да поставите директно копиран списък от електронния дневник (напр. "1. Иван Иванов") - номерацията се премахва автоматично.</span>
                             </div>
                         </div>
                         <div class="form-actions">

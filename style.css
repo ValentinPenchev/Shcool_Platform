@@ -7,6 +7,7 @@
     --text-muted: #64748b;
     --border-color: #e2e8f0;
     --card-bg: #ffffff;
+    --surface-alt: #f8fafc;
     --badge-green-bg: #dcfce7;
     --badge-green-text: #166534;
     --badge-amber-bg: #fef3c7;
@@ -16,6 +17,25 @@
     --word-color: #0284c7;
     --excel-color: #16a34a;
     --ppt-color: #ea580c;
+}
+
+/* Тъмна тема - активира се чрез data-theme="dark" на <html>, превключвана от JS и пазена в localStorage */
+:root[data-theme="dark"] {
+    --bg-main: #0f172a;
+    --sidebar-bg: #1e293b;
+    --primary-blue: #3b82f6;
+    --primary-hover: #60a5fa;
+    --text-dark: #e2e8f0;
+    --text-muted: #94a3b8;
+    --border-color: #334155;
+    --card-bg: #1e293b;
+    --surface-alt: #273549;
+    --badge-green-bg: #14532d;
+    --badge-green-text: #86efac;
+    --badge-amber-bg: #78350f;
+    --badge-amber-text: #fcd34d;
+    --badge-red-bg: #7f1d1d;
+    --badge-red-text: #fca5a5;
 }
 
 * {
@@ -233,6 +253,13 @@ body {
     margin-top: 2px;
 }
 
+.field-hint {
+    display: block;
+    font-size: 12px;
+    color: var(--text-muted);
+    margin-top: 4px;
+}
+
 .table-card-header {
     display: flex;
     justify-content: space-between;
@@ -267,7 +294,7 @@ body {
     border-radius: 8px;
     font-size: 13px;
     outline: none;
-    background: #fff;
+    background: var(--card-bg);
 }
 
 .search-input-wrap input:focus {
@@ -396,7 +423,7 @@ body {
     padding: 9px 12px;
     border: 1px solid var(--border-color);
     border-radius: 8px;
-    background: #fff;
+    background: var(--card-bg);
     font-size: 14px;
     outline: none;
     margin-top: 6px;
@@ -410,7 +437,7 @@ body {
 }
 
 .stat-card {
-    background: #fff;
+    background: var(--card-bg);
     border: 1px solid var(--border-color);
     border-radius: 12px;
     padding: 20px;
@@ -541,7 +568,7 @@ body {
 }
 
 .chart-card, .table-card, .form-card {
-    background: #fff;
+    background: var(--card-bg);
     border: 1px solid var(--border-color);
     border-radius: 12px;
     padding: 20px;
@@ -560,7 +587,7 @@ body {
     font-size: 12px;
     color: var(--text-muted);
     border-bottom: 1px solid var(--border-color);
-    background: #f8fafc;
+    background: var(--surface-alt);
 }
 
 .styled-table td {
@@ -574,7 +601,7 @@ body {
 }
 
 .styled-table tr.clickable-row:hover {
-    background: #f8fafc;
+    background: var(--surface-alt);
 }
 
 .btn-primary {
@@ -603,7 +630,7 @@ body {
 }
 
 .btn-secondary {
-    background: #fff;
+    background: var(--card-bg);
     color: var(--text-dark);
     border: 1px solid var(--border-color);
     padding: 10px 20px;
@@ -752,7 +779,7 @@ body {
     border-radius: 8px;
     padding: 10px 14px;
     margin-bottom: 10px;
-    background: #fff;
+    background: var(--card-bg);
 }
 
 .exercise-batch-card:last-child {
@@ -770,7 +797,7 @@ body {
 }
 
 .exercise-batch-card.progress {
-    background: #f8fafc;
+    background: var(--surface-alt);
 }
 
 .batch-card-header {
@@ -836,7 +863,7 @@ body {
 
 /* Разгънат ред с пропуснати критерии под реда с резултата */
 .submission-detail-row td {
-    background: #f8fafc;
+    background: var(--surface-alt);
     padding: 14px 20px;
     border-bottom: 1px solid var(--border-color);
 }
@@ -934,7 +961,7 @@ body {
     height: 30px;
     border-radius: 6px;
     border: 1px solid var(--border-color);
-    background: #fff;
+    background: var(--card-bg);
     color: var(--text-dark);
     cursor: pointer;
 }
@@ -1003,7 +1030,7 @@ body {
 .btn-icon,
 .btn-danger-icon {
     border: 1px solid var(--border-color);
-    background: #fff;
+    background: var(--card-bg);
     color: var(--text-muted);
     width: 30px;
     height: 30px;
@@ -1036,7 +1063,7 @@ body.student-body {
     justify-content: space-between;
     align-items: center;
     padding: 16px 40px;
-    background: #ffffff;
+    background: var(--card-bg);
     border-bottom: 1px solid var(--border-color);
 }
 
@@ -1053,7 +1080,7 @@ body.student-body {
 }
 
 .btn-help {
-    background: #ffffff;
+    background: var(--card-bg);
     border: 1px solid var(--border-color);
     padding: 8px 16px;
     border-radius: 8px;
@@ -1148,7 +1175,7 @@ body.student-body {
     border-radius: 12px;
     padding: 24px;
     text-align: center;
-    background: #f8fafc;
+    background: var(--surface-alt);
     transition: 0.2s;
     cursor: pointer;
 }
@@ -1262,4 +1289,79 @@ body.student-body {
     align-items: center;
     justify-content: center;
     gap: 6px;
+}
+
+/* Дискретни изскачащи съобщения (toasts) вместо блокиращи alert() диалози */
+.toast-container {
+    position: fixed;
+    top: 20px;
+    right: 20px;
+    z-index: 9999;
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+    pointer-events: none;
+}
+
+.toast {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding: 12px 16px;
+    border-radius: 10px;
+    background: var(--card-bg);
+    color: var(--text-dark);
+    box-shadow: 0 8px 24px rgba(0, 0, 0, 0.16);
+    font-size: 13px;
+    font-weight: 600;
+    min-width: 240px;
+    max-width: 360px;
+    pointer-events: auto;
+    border-left: 4px solid var(--primary-blue);
+    animation: toast-in 0.25s ease;
+}
+
+.toast.success { border-left-color: #16a34a; }
+.toast.error { border-left-color: #dc2626; }
+.toast.warning { border-left-color: #f59e0b; }
+.toast.info { border-left-color: var(--primary-blue); }
+
+.toast.success i { color: #16a34a; }
+.toast.error i { color: #dc2626; }
+.toast.warning i { color: #f59e0b; }
+.toast.info i { color: var(--primary-blue); }
+
+.toast.hide {
+    animation: toast-out 0.25s ease forwards;
+}
+
+@keyframes toast-in {
+    from { opacity: 0; transform: translateX(30px); }
+    to { opacity: 1; transform: translateX(0); }
+}
+
+@keyframes toast-out {
+    from { opacity: 1; transform: translateX(0); }
+    to { opacity: 0; transform: translateX(30px); }
+}
+
+/* Превключвател за тъмна тема в страничното меню */
+.theme-toggle-btn {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    width: 100%;
+    padding: 10px 14px;
+    margin-top: auto;
+    border: 1px solid var(--border-color);
+    border-radius: 8px;
+    background: var(--surface-alt);
+    color: var(--text-dark);
+    font-size: 13px;
+    font-weight: 600;
+    cursor: pointer;
+}
+
+.theme-toggle-btn:hover {
+    filter: brightness(0.97);
 }

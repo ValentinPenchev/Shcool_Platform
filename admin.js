@@ -72,7 +72,6 @@ async function loadClasses() {
 
         renderClassesTable(Object.entries(classesData));
         renderClassChips();
-        renderAllExerciseLinks();
     } catch (err) {
         console.error("Грешка при зареждане на класовете:", err);
     }
@@ -205,7 +204,6 @@ function upsertClassInUI(classId, className, students) {
 
     renderClassesTable(Object.entries(classesData));
     renderClassChips();
-    renderAllExerciseLinks();
 }
 
 // Зарежда данните за клас обратно във формата, за да могат да бъдат редактирани
@@ -256,7 +254,6 @@ async function deleteClass(classId) {
         document.querySelectorAll(`#filter-group option[value="${classId}"], #assign-group-select option[value="${classId}"], #filter-assignments-class option[value="${classId}"], #exercise-class-filter option[value="${classId}"]`)
             .forEach(opt => opt.remove());
         renderClassChips();
-        renderAllExerciseLinks();
 
         if (editingClassId === classId) cancelClassEdit();
 
@@ -841,31 +838,6 @@ function copyExerciseLink(explicitClassId) {
     });
 }
 
-// Постоянен списък с линковете за качване на упражнения на всички класове -
-// винаги видим в страница "Упражнения", без да е нужно избиране на клас първо
-function renderAllExerciseLinks() {
-    const container = document.getElementById("exercises-all-links-list");
-    if (!container) return;
-
-    const entries = Object.entries(classesData);
-    if (entries.length === 0) {
-        container.innerHTML = `<p class="stat-sub" style="padding:12px;">Няма създадени класове.</p>`;
-        return;
-    }
-
-    container.innerHTML = entries.map(([classId, data], index) => {
-        const url = buildExerciseLink(classId);
-        return `
-            <div class="exercise-link-row">
-                <span class="class-badge ${classBadgeColorIndex(index)}">${(data.className || classId).slice(0, 2)}</span>
-                <strong>${data.className}</strong>
-                <a href="${url}" target="_blank" rel="noopener" class="task-link">${url}</a>
-                <button type="button" class="btn-icon" onclick="copyExerciseLink('${escapeJsString(classId)}')" title="Копирай линка"><i class="fa-regular fa-copy"></i></button>
-            </div>
-        `;
-    }).join("");
-}
-
 // Разбива списък на последователни групи по `size` елемента (за групиране по 5 качвания)
 function chunkIntoBatches(list, size) {
     const batches = [];
@@ -883,9 +855,11 @@ function escapeJsString(str) {
 // Зарежда качванията + вече въведените оценки за избрания клас и обновява таблицата
 async function loadExercisesData() {
     const classId = document.getElementById("exercise-class-filter").value;
+    const linkCard = document.getElementById("exercises-link-card");
     const tbody = document.querySelector("#exercises-table tbody");
 
     if (!classId) {
+        linkCard.style.display = "none";
         tbody.innerHTML = `
             <tr><td colspan="4">
                 <div class="empty-state">
@@ -897,6 +871,11 @@ async function loadExercisesData() {
         `;
         return;
     }
+
+    const url = buildExerciseLink(classId);
+    document.getElementById("exercises-link-url").href = url;
+    document.getElementById("exercises-link-url").textContent = url;
+    linkCard.style.display = "flex";
 
     // Качванията са основната справка - зареждат се отделно от историята на оценките,
     // за да не изчезват вече записани качвания само защото по-новата справка за

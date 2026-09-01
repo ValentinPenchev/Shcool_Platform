@@ -835,7 +835,9 @@ async function loadAttendanceData() {
     if (!input.value) input.value = formatDateForInput(new Date());
 
     const data = classesData[lockedClassId];
-    document.getElementById("attendance-subtitle").textContent = `Клас: ${data ? data.className : lockedClassId}`;
+    const className = data ? data.className : lockedClassId;
+    document.getElementById("attendance-subtitle").textContent = `Клас: ${className}`;
+    document.getElementById("attendance-list-title").textContent = `Ученици в клас ${className}`;
 
     try {
         const res = await adminFetch(`${API_URL}/admin/attendance?group_id=${encodeURIComponent(lockedClassId)}&record_date=${input.value}`);
@@ -847,6 +849,12 @@ async function loadAttendanceData() {
     }
 
     renderAttendanceList();
+}
+
+// Ученик без запис за деня се показва като "Присъства" по подразбиране (маркират се
+// изключенията - отсъстващите), но нищо не се записва в базата, докато не се кликне
+function effectiveAttendanceStatus(name, statusByName) {
+    return statusByName[name] === 'absent' ? 'absent' : 'present';
 }
 
 function renderAttendanceList() {
@@ -861,28 +869,32 @@ function renderAttendanceList() {
         container.innerHTML = `<p class="stat-sub" style="padding:12px;">Няма ученици в този клас.</p>`;
     } else {
         container.innerHTML = students.map((name, index) => {
-            const status = statusByName[name];
+            const status = effectiveAttendanceStatus(name, statusByName);
+            const label = status === 'present' ? 'Присъства' : 'Отсъства';
+            const icon = status === 'present' ? 'fa-circle-check' : 'fa-circle-xmark';
             return `
-                <div class="attendance-row">
-                    <div class="attendance-row-name">
-                        <span class="row-avatar a${index % 5}">${name.slice(0, 1).toUpperCase()}</span>
-                        ${name}
-                    </div>
-                    <div class="attendance-toggle">
-                        <button type="button" class="present ${status === 'present' ? 'active' : ''}" onclick="setAttendance('${escapeJsString(name)}', 'present')">Присъства</button>
-                        <button type="button" class="absent ${status === 'absent' ? 'active' : ''}" onclick="setAttendance('${escapeJsString(name)}', 'absent')">Отсъства</button>
-                    </div>
+                <div class="attendance-card" onclick="toggleAttendanceCard('${escapeJsString(name)}')" title="Кликни, за да смениш статуса">
+                    <div class="attendance-card-avatar a${index % 5}">${name.slice(0, 1).toUpperCase()}</div>
+                    <div class="attendance-card-name">${name}</div>
+                    <span class="attendance-status-pill ${status}"><i class="fa-solid ${icon}"></i> ${label}</span>
                 </div>
             `;
         }).join("");
     }
 
     const total = students.length;
-    const present = students.filter(name => statusByName[name] === 'present').length;
-    const absent = students.filter(name => statusByName[name] === 'absent').length;
+    const present = students.filter(name => effectiveAttendanceStatus(name, statusByName) === 'present').length;
+    const absent = total - present;
     document.getElementById("attendance-total").textContent = total;
     document.getElementById("attendance-present").textContent = present;
     document.getElementById("attendance-absent").textContent = absent;
+}
+
+function toggleAttendanceCard(name) {
+    const existing = attendanceCache.find(r => r.student_name === name);
+    const currentStatus = existing ? existing.status : 'present';
+    const nextStatus = currentStatus === 'present' ? 'absent' : 'present';
+    setAttendance(name, nextStatus);
 }
 
 async function setAttendance(name, status) {

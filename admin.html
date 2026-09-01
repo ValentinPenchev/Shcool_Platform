@@ -161,6 +161,18 @@
                                 <input type="text" id="assign-title" class="custom-input" placeholder="напр. Упражнение 1 - MS Word" required>
                             </div>
                         </div>
+                        <div class="form-grid">
+                            <div class="form-group">
+                                <label>Краен срок (незадължително):</label>
+                                <input type="datetime-local" id="assign-deadline" class="custom-input">
+                            </div>
+                            <div class="form-group">
+                                <label>Зареди критерии от шаблон:</label>
+                                <select id="assign-template-select" class="custom-select">
+                                    <option value="">-- Без шаблон --</option>
+                                </select>
+                            </div>
+                        </div>
                         <div class="form-group">
                             <label>Качете Word файл / Документ с критерии:</label>
                             <div class="drop-zone drop-zone-row" id="criteria-drop-zone">
@@ -175,9 +187,38 @@
                                 <input type="file" id="criteria-file-input" accept=".docx" hidden>
                             </div>
                             <div id="criteria-file-name-display" class="selected-file-name"></div>
+                            <span class="field-hint">Ако сте избрали шаблон по-горе, той има предимство пред файла тук.</span>
+                        </div>
+                        <div class="form-group">
+                            <label class="checkbox-label">
+                                <input type="checkbox" id="assign-save-as-template">
+                                Запази тези критерии като нов шаблон за бъдещи задачи
+                            </label>
+                            <input type="text" id="assign-template-title" class="custom-input" placeholder="Име на шаблона (напр. Word - основно форматиране)" style="margin-top:8px; display:none;">
+                        </div>
+                        <div class="form-grid">
+                            <div class="form-group">
+                                <label>Помощен материал - файл (незадължително):</label>
+                                <input type="file" id="assign-reference-file" class="custom-input">
+                            </div>
+                            <div class="form-group">
+                                <label>Помощен материал - линк (незадължително):</label>
+                                <input type="url" id="assign-reference-link" class="custom-input" placeholder="напр. линк към видео/пример">
+                            </div>
                         </div>
                         <button type="submit" class="btn-primary"><i class="fa-solid fa-plus"></i> Създай Задача</button>
                     </form>
+                </div>
+
+                <div class="form-card" style="margin-top: 25px;">
+                    <div class="card-title-row">
+                        <div class="icon-chip orange"><i class="fa-solid fa-copy"></i></div>
+                        <div>
+                            <h3>Запазени шаблони</h3>
+                            <div class="card-subtitle">Критерии, готови за многократна употреба между паралелки</div>
+                        </div>
+                    </div>
+                    <div id="templates-list"></div>
                 </div>
 
                 <div class="table-card" style="margin-top: 25px;">
@@ -208,6 +249,8 @@
                                 <tr>
                                     <th>Заглавие</th>
                                     <th>Клас</th>
+                                    <th>Краен срок</th>
+                                    <th>Материали</th>
                                     <th>Линк</th>
                                     <th>Действия</th>
                                 </tr>
@@ -320,6 +363,7 @@
                         <table class="styled-table">
                             <thead>
                                 <tr>
+                                    <th></th>
                                     <th>Име на клас</th>
                                     <th>ID</th>
                                     <th>Ученици</th>

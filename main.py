@@ -3,6 +3,7 @@ import json
 import hashlib
 import uuid
 import asyncio
+from datetime import datetime
 from typing import Optional
 from fastapi import FastAPI, UploadFile, File, Form, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
@@ -46,6 +47,15 @@ def _percentage_to_grade(percentage: float) -> dict:
         grade, label = 2, "Слаб"
     return {"grade": grade, "grade_label": label}
 
+def _parse_iso(ts):
+    """Разбира ISO-8601 timestamp низ (както го връща Supabase), иначе None."""
+    if not ts:
+        return None
+    try:
+        return datetime.fromisoformat(str(ts).replace("Z", "+00:00"))
+    except Exception:
+        return None
+
 async def periodic_cleanup():
     while True:
         try:
@@ -79,7 +89,8 @@ async def create_or_update_group(
     group_id: str = Form(...),
     group_name: str = Form(...),
     students_json: Optional[str] = Form(None),
-    file: Optional[UploadFile] = File(None)
+    file: Optional[UploadFile] = File(None),
+    inactive_students_json: Optional[str] = Form(None)
 ):
     students = []
     if students_json and students_json.strip():
@@ -110,7 +121,17 @@ async def create_or_update_group(
         "group_name": group_name,
         "students_json": students
     }
-    
+
+    # inactive_students_json се изпраща само от груповите действия (деактивиране/
+    # активиране) - при обикновен запис на класа не се подава и не се пипа в базата
+    if inactive_students_json is not None:
+        try:
+            parsed_inactive = json.loads(inactive_students_json)
+            if isinstance(parsed_inactive, list):
+                data["inactive_students_json"] = [str(item).strip() for item in parsed_inactive if str(item).strip()]
+        except Exception:
+            pass
+
     try:
         res = supabase.table("groups").upsert(data).execute()
         return {"status": "success", "data": res.data}
@@ -152,12 +173,22 @@ async def create_assignment(
     title: str = Form(...),
     group_id: str = Form(...),
     criteria_json: Optional[str] = Form(None),
-    criteria_file: Optional[UploadFile] = File(None)
+    criteria_file: Optional[UploadFile] = File(None),
+    template_id: Optional[str] = Form(None),
+    deadline: Optional[str] = Form(None),
+    reference_link: Optional[str] = Form(None),
+    reference_file: Optional[UploadFile] = File(None)
 ):
     assignment_id = str(uuid.uuid4())[:8]
     criteria_parsed = {}
 
-    if criteria_file and criteria_file.filename.lower().endswith(".docx"):
+    # Шаблон с готови критерии - взима им предимство пред качен Word/ръчен JSON,
+    # за да не се въвеждат наново едни и същи критерии за всяка паралелка
+    if template_id:
+        tmpl_res = supabase.table("assignment_templates").select("criteria_json").eq("id", template_id).execute()
+        if tmpl_res.data:
+            criteria_parsed = tmpl_res.data[0].get("criteria_json") or {}
+    elif criteria_file and criteria_file.filename.lower().endswith(".docx"):
         try:
             content = await criteria_file.read()
             doc = docx.Document(io.BytesIO(content))
@@ -175,13 +206,25 @@ async def create_assignment(
         except Exception:
             criteria_parsed = {}
 
+    reference_file_url = None
+    if reference_file and reference_file.filename:
+        try:
+            ref_contents = await reference_file.read()
+            ref_path = f"materials/{sanitize_storage_segment(assignment_id)}/{sanitize_storage_segment(reference_file.filename)}"
+            reference_file_url = upload_to_supabase(ref_contents, reference_file.filename, ref_path)
+        except Exception as e:
+            print(f"Грешка при качване на помощния материал: {e}")
+
     data = {
         "id": assignment_id,
         "title": title,
         "group_id": group_id,
-        "criteria_json": criteria_parsed
+        "criteria_json": criteria_parsed,
+        "deadline": deadline or None,
+        "reference_link": reference_link.strip() if reference_link and reference_link.strip() else None,
+        "reference_file_url": reference_file_url
     }
-    
+
     try:
         supabase.table("assignments").upsert(data).execute()
         return {
@@ -202,6 +245,39 @@ async def delete_assignment(assignment_id: str):
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Грешка при изтриване на задачата: {str(e)}")
 
+# Шаблони за задачи (запазени критерии за повторна употреба между паралелки)
+@app.get("/api/admin/templates")
+async def get_templates():
+    try:
+        res = supabase.table("assignment_templates").select("*").order("created_at", desc=True).execute()
+        return res.data or []
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Грешка при четене на шаблоните: {str(e)}")
+
+@app.post("/api/admin/templates")
+async def create_template(
+    title: str = Form(...),
+    criteria_json: str = Form(...)
+):
+    try:
+        parsed = json.loads(criteria_json)
+    except Exception:
+        raise HTTPException(status_code=400, detail="Невалидни критерии за шаблон.")
+
+    try:
+        supabase.table("assignment_templates").insert({"title": title, "criteria_json": parsed}).execute()
+        return {"status": "success"}
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Грешка при запис на шаблона: {str(e)}")
+
+@app.delete("/api/admin/templates/{template_id}")
+async def delete_template(template_id: int):
+    try:
+        supabase.table("assignment_templates").delete().eq("id", template_id).execute()
+        return {"status": "success", "message": f"Шаблонът {template_id} е изтрит."}
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Грешка при изтриване на шаблона: {str(e)}")
+
 @app.get("/api/assignments/{assignment_id}")
 async def get_assignment(assignment_id: str):
     res = supabase.table("assignments").select("*").eq("id", assignment_id).execute()
@@ -220,7 +296,10 @@ async def get_assignment(assignment_id: str):
         "group_id": assignment["group_id"],
         "group_name": group_name,
         "students": students,
-        "criteria": assignment.get("criteria_json", {})
+        "criteria": assignment.get("criteria_json", {}),
+        "deadline": assignment.get("deadline"),
+        "reference_file_url": assignment.get("reference_file_url"),
+        "reference_link": assignment.get("reference_link")
     }
 
 # -----------------------------------------------------------------------------
@@ -309,6 +388,12 @@ async def get_submissions(group_id: Optional[str] = None, assignment_id: Optiona
         res = query.execute()
         rows = res.data or []
 
+        # Крайни срокове по assignment_id - за автоматично маркиране на закъснели предавания
+        deadlines_res = supabase.table("assignments").select("id, deadline").execute()
+        deadline_by_assignment = {
+            a["id"]: a.get("deadline") for a in (deadlines_res.data or []) if a.get("deadline")
+        }
+
         # assignment_id се пази вътре в details_json - извличаме го тук за удобство
         for row in rows:
             details = row.get("details_json")
@@ -316,6 +401,10 @@ async def get_submissions(group_id: Optional[str] = None, assignment_id: Optiona
             grade_info = _percentage_to_grade(row.get("percentage") or 0)
             row["grade"] = grade_info["grade"]
             row["grade_label"] = grade_info["grade_label"]
+
+            deadline_dt = _parse_iso(deadline_by_assignment.get(row["assignment_id"]))
+            submitted_dt = _parse_iso(row.get("created_at"))
+            row["is_late"] = bool(deadline_dt and submitted_dt and submitted_dt > deadline_dt)
 
         if assignment_id:
             rows = [r for r in rows if r.get("assignment_id") == assignment_id]

@@ -41,11 +41,42 @@ async function loadAssignment() {
         const subtitle = document.getElementById("assignment-subtitle");
         subtitle.textContent = `Задача: ${assignmentData.title} · Клас: ${assignmentData.group_name || assignmentData.group_id}`;
 
+        if (assignmentData.deadline) {
+            const deadlineEl = document.getElementById("assignment-deadline");
+            const isPast = new Date(assignmentData.deadline) < new Date();
+            deadlineEl.textContent = `Краен срок: ${formatDeadline(assignmentData.deadline)}${isPast ? " (изтекъл)" : ""}`;
+            deadlineEl.style.color = isPast ? "#dc2626" : "";
+            deadlineEl.style.display = "block";
+        }
+
+        showReferenceMaterials(assignmentData);
         populateStudentSelect(assignmentData.students);
     } catch (err) {
         console.error("Грешка при зареждане на задачата:", err);
         showAlert(err.message || "Грешка при зареждане на задачата.");
         document.getElementById("submission-form").style.display = "none";
+    }
+}
+
+function formatDeadline(dateStr) {
+    const d = new Date(dateStr);
+    if (isNaN(d.getTime())) return dateStr;
+    const pad = (n) => String(n).padStart(2, '0');
+    return `${pad(d.getDate())}.${pad(d.getMonth() + 1)}.${d.getFullYear()} ${pad(d.getHours())}:${pad(d.getMinutes())}`;
+}
+
+// Показва линкове към помощните материали на задачата (файл и/или външен линк), ако има
+function showReferenceMaterials(data) {
+    const links = [];
+    if (data.reference_file_url) {
+        links.push(`<a href="${data.reference_file_url}" target="_blank" rel="noopener">Изтегли примерен файл</a>`);
+    }
+    if (data.reference_link) {
+        links.push(`<a href="${data.reference_link}" target="_blank" rel="noopener">Отвори помощен линк</a>`);
+    }
+    if (links.length > 0) {
+        document.getElementById("reference-materials-links").innerHTML = links.join(" &middot; ");
+        document.getElementById("reference-materials-card").style.display = "flex";
     }
 }
 

@@ -260,6 +260,129 @@ body {
     margin-top: 4px;
 }
 
+.checkbox-label {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    font-size: 13px;
+    font-weight: 600;
+    cursor: pointer;
+}
+
+.checkbox-label input[type="checkbox"] {
+    width: 16px;
+    height: 16px;
+    cursor: pointer;
+}
+
+.template-row {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 10px 12px;
+    border: 1px solid var(--border-color);
+    border-radius: 8px;
+    margin-top: 8px;
+    font-size: 13px;
+    font-weight: 600;
+}
+
+.template-row i {
+    color: var(--text-muted);
+    margin-right: 8px;
+}
+
+/* Панел за управление на ученици в разгънат ред на клас (групови действия) */
+.roster-panel {
+    padding: 4px 0;
+}
+
+.roster-toolbar {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 12px;
+    margin-bottom: 14px;
+    padding-bottom: 12px;
+    border-bottom: 1px solid var(--border-color);
+}
+
+.roster-move-select {
+    width: auto;
+    margin-top: 0;
+}
+
+.btn-danger-icon-text {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    background: var(--badge-red-bg);
+    color: var(--badge-red-text);
+    border: none;
+    border-radius: 8px;
+    padding: 8px 14px;
+    font-size: 13px;
+    font-weight: 600;
+    cursor: pointer;
+}
+
+.btn-danger-icon-text:hover {
+    filter: brightness(0.95);
+}
+
+.roster-checklist {
+    list-style: none;
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(180px, 1fr));
+    gap: 8px;
+}
+
+.roster-checklist li {
+    padding: 6px 10px;
+    border: 1px solid var(--border-color);
+    border-radius: 8px;
+}
+
+.roster-inactive-section {
+    margin-top: 16px;
+    padding-top: 12px;
+    border-top: 1px solid var(--border-color);
+    font-size: 13px;
+}
+
+.inactive-chip-row {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+    margin-top: 8px;
+}
+
+.inactive-chip {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    background: var(--surface-alt);
+    color: var(--text-muted);
+    border-radius: 999px;
+    padding: 5px 6px 5px 12px;
+    font-size: 12px;
+    font-weight: 600;
+}
+
+.inactive-chip button {
+    border: none;
+    background: transparent;
+    color: var(--primary-blue);
+    cursor: pointer;
+    padding: 4px;
+    border-radius: 50%;
+    display: inline-flex;
+}
+
+.inactive-chip button:hover {
+    background: var(--card-bg);
+}
+
 .table-card-header {
     display: flex;
     justify-content: space-between;

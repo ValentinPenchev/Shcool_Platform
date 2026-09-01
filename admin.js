@@ -62,7 +62,60 @@ document.addEventListener("DOMContentLoaded", async () => {
     loadDashboardData();
     startDashboardPolling();
     setupCriteriaDropZone();
+    loadTemplates();
 });
+
+// Шаблони за задачи - зарежда ги в падащото меню и в списъка за управление
+let templatesCache = [];
+
+async function loadTemplates() {
+    try {
+        const res = await fetch(`${API_URL}/admin/templates`);
+        if (!res.ok) throw new Error("Грешка при заявката към сървъра");
+        templatesCache = await res.json();
+
+        const select = document.getElementById("assign-template-select");
+        if (select) {
+            const currentValue = select.value;
+            select.innerHTML = '<option value="">-- Без шаблон --</option>' +
+                templatesCache.map(t => `<option value="${t.id}">${t.title}</option>`).join("");
+            select.value = currentValue;
+        }
+
+        renderTemplatesList();
+    } catch (err) {
+        console.error("Грешка при зареждане на шаблоните:", err);
+    }
+}
+
+function renderTemplatesList() {
+    const container = document.getElementById("templates-list");
+    if (!container) return;
+
+    if (templatesCache.length === 0) {
+        container.innerHTML = `<p class="stat-sub" style="padding:8px 0;">Няма запазени шаблони.</p>`;
+        return;
+    }
+
+    container.innerHTML = templatesCache.map(t => `
+        <div class="template-row">
+            <span><i class="fa-regular fa-file-lines"></i> ${t.title}</span>
+            <button type="button" class="btn-danger-icon" onclick="deleteTemplate(${t.id})" title="Изтрий шаблона"><i class="fa-regular fa-trash-can"></i></button>
+        </div>
+    `).join("");
+}
+
+async function deleteTemplate(templateId) {
+    if (!confirm("Сигурни ли сте, че искате да изтриете този шаблон?")) return;
+    try {
+        const response = await fetch(`${API_URL}/admin/templates/${templateId}`, { method: "DELETE" });
+        if (!response.ok) throw new Error("Грешка при изтриване от сървъра");
+        showToast("Шаблонът е изтрит.", "success");
+        await loadTemplates();
+    } catch (err) {
+        showToast("Грешка при изтриване на шаблона: " + err.message, "error");
+    }
+}
 
 // Превключване между секциите в интерфейса
 function showSection(sectionId) {
@@ -117,7 +170,8 @@ async function loadClasses() {
             const classId = c.group_id || c.id;
             const className = c.group_name || c.name;
             const classStudents = c.students_json || c.students || [];
-            classesData[classId] = { className, students: classStudents };
+            const inactiveStudents = c.inactive_students_json || [];
+            classesData[classId] = { className, students: classStudents, inactiveStudents };
 
             filterGroup.innerHTML += `<option value="${classId}">${className}</option>`;
             assignGroupSelect.innerHTML += `<option value="${classId}">${className}</option>`;
@@ -173,7 +227,7 @@ function renderClassesTable(entries) {
     const classesTable = document.getElementById("classes-table-body");
     if (entries.length === 0) {
         classesTable.innerHTML = `
-            <tr><td colspan="5">
+            <tr><td colspan="6">
                 <div class="empty-state">
                     <div class="empty-icon"><i class="fa-solid fa-inbox"></i></div>
                     <h4>Няма намерени класове</h4>
@@ -184,7 +238,7 @@ function renderClassesTable(entries) {
         return;
     }
     classesTable.innerHTML = entries
-        .map(([classId, data], index) => renderClassRow(classId, data.className, (data.students || []).length, index))
+        .map(([classId, data], index) => renderClassRow(classId, data, index))
         .join("");
 }
 
@@ -195,11 +249,17 @@ function classBadgeColorIndex(index) {
 
 // Маркъп на един ред в таблицата с класове (кликването върху реда отваря резултатите на класа в Статистика).
 // Линкът за упражнения е винаги видим тук, за да не се налага влизане в Упражнения
-// и избор на клас само за да се копира линкът.
-function renderClassRow(classId, className, studentsCount, colorIndex = 0) {
+// и избор на клас само за да се копира линкът. Редът се разгъва до списък с ученици
+// с чекбоксове за групови действия (изтриване/деактивиране/преместване в друг клас).
+function renderClassRow(classId, data, colorIndex = 0) {
+    const className = data.className;
+    const students = data.students || [];
     const exerciseUrl = buildExerciseLink(classId);
+    const rowId = `class-${classId}`;
+
     return `
         <tr id="class-row-${classId}" class="clickable-row" onclick="viewClassResults('${classId}')" title="Отвори резултатите за този клас">
+            <td><button type="button" class="btn-icon expand-toggle" id="toggle-${rowId}" onclick="event.stopPropagation(); toggleClassRoster('${classId}')" title="Управление на ученици"><i class="fa-solid fa-chevron-right"></i></button></td>
             <td>
                 <div class="class-name-cell">
                     <span class="class-badge ${classBadgeColorIndex(colorIndex)}">${(className || classId).slice(0, 2)}</span>
@@ -207,7 +267,7 @@ function renderClassRow(classId, className, studentsCount, colorIndex = 0) {
                 </div>
             </td>
             <td>${classId}</td>
-            <td><i class="fa-solid fa-user-group" style="color: var(--text-muted); margin-right: 6px;"></i>${studentsCount} ученици</td>
+            <td><i class="fa-solid fa-user-group" style="color: var(--text-muted); margin-right: 6px;"></i>${students.length} ученици</td>
             <td>
                 <div class="file-name-cell">
                     <a href="${exerciseUrl}" target="_blank" rel="noopener" class="task-link" onclick="event.stopPropagation();">${exerciseUrl}</a>
@@ -219,6 +279,9 @@ function renderClassRow(classId, className, studentsCount, colorIndex = 0) {
                 <button type="button" class="btn-danger-icon" onclick="event.stopPropagation(); deleteClass('${classId}')" title="Изтрий класа"><i class="fa-regular fa-trash-can"></i></button>
             </td>
         </tr>
+        <tr class="submission-detail-row" id="detail-${rowId}" hidden>
+            <td colspan="6">${buildClassRosterHtml(classId)}</td>
+        </tr>
     `;
 }
 
@@ -226,6 +289,173 @@ function renderClassRow(classId, className, studentsCount, colorIndex = 0) {
 function viewClassResults(classId) {
     syncClassFilter(classId);
     showSection('dashboard');
+}
+
+// Разгъва/свива панела за управление на учениците на даден клас
+function toggleClassRoster(classId) {
+    const rowId = `class-${classId}`;
+    const row = document.getElementById(`detail-${rowId}`);
+    const toggleBtn = document.getElementById(`toggle-${rowId}`);
+    if (!row) return;
+    row.hidden = !row.hidden;
+    if (toggleBtn) toggleBtn.classList.toggle('expanded', !row.hidden);
+}
+
+// Изгражда чеклиста с активни ученици + груповите действия + списъка с деактивирани
+function buildClassRosterHtml(classId) {
+    const data = classesData[classId] || { students: [], inactiveStudents: [] };
+    const students = data.students || [];
+    const inactive = data.inactiveStudents || [];
+
+    const otherClassesOptions = Object.entries(classesData)
+        .filter(([id]) => id !== classId)
+        .map(([id, d]) => `<option value="${id}">${d.className}</option>`)
+        .join("");
+
+    const checklistHtml = students.length === 0
+        ? `<p class="stat-sub">Няма активни ученици в този клас.</p>`
+        : `<ul class="roster-checklist">${students.map(name => `
+            <li>
+                <label class="checkbox-label">
+                    <input type="checkbox" class="roster-checkbox" data-class="${classId}" value="${escapeJsString(name)}">
+                    ${name}
+                </label>
+            </li>
+        `).join("")}</ul>`;
+
+    const inactiveHtml = inactive.length === 0 ? "" : `
+        <div class="roster-inactive-section">
+            <strong>Деактивирани ученици:</strong>
+            <div class="inactive-chip-row">
+                ${inactive.map(name => `
+                    <span class="inactive-chip">
+                        ${name}
+                        <button type="button" onclick="reactivateStudent('${classId}', '${escapeJsString(name)}')" title="Активирай отново"><i class="fa-solid fa-rotate-left"></i></button>
+                    </span>
+                `).join("")}
+            </div>
+        </div>
+    `;
+
+    return `
+        <div class="roster-panel">
+            <div class="roster-toolbar">
+                <label class="checkbox-label">
+                    <input type="checkbox" onchange="toggleAllRosterCheckboxes('${classId}', this.checked)">
+                    Избери всички
+                </label>
+                <button type="button" class="btn-danger-icon-text" onclick="bulkDeleteStudents('${classId}')"><i class="fa-regular fa-trash-can"></i> Изтрий избраните</button>
+                <button type="button" class="btn-secondary" onclick="bulkDeactivateStudents('${classId}')"><i class="fa-solid fa-user-slash"></i> Деактивирай избраните</button>
+                <select id="move-target-${classId}" class="custom-select roster-move-select">
+                    <option value="">-- Премести в клас --</option>
+                    ${otherClassesOptions}
+                </select>
+                <button type="button" class="btn-secondary" onclick="bulkMoveStudents('${classId}')"><i class="fa-solid fa-right-left"></i> Премести</button>
+            </div>
+            ${checklistHtml}
+            ${inactiveHtml}
+        </div>
+    `;
+}
+
+function toggleAllRosterCheckboxes(classId, checked) {
+    document.querySelectorAll(`.roster-checkbox[data-class="${classId}"]`).forEach(cb => { cb.checked = checked; });
+}
+
+function getCheckedRosterNames(classId) {
+    return Array.from(document.querySelectorAll(`.roster-checkbox[data-class="${classId}"]:checked`)).map(cb => cb.value);
+}
+
+// Записва обновен състав на класа (активни + по избор неактивни ученици) и
+// обновява локалния кеш и таблицата
+async function saveClassRoster(classId, className, students, inactiveStudents) {
+    const formData = new FormData();
+    formData.append("group_id", classId);
+    formData.append("group_name", className);
+    formData.append("students_json", JSON.stringify(students));
+    if (inactiveStudents !== undefined) {
+        formData.append("inactive_students_json", JSON.stringify(inactiveStudents));
+    }
+
+    const response = await fetch(`${API_URL}/admin/groups`, { method: "POST", body: formData });
+    if (!response.ok) {
+        const errData = await response.json().catch(() => ({}));
+        throw new Error(errData.detail || `HTTP грешка: ${response.status}`);
+    }
+
+    const previousInactive = (classesData[classId] && classesData[classId].inactiveStudents) || [];
+    classesData[classId] = {
+        className,
+        students,
+        inactiveStudents: inactiveStudents !== undefined ? inactiveStudents : previousInactive
+    };
+    renderClassesTable(Object.entries(classesData));
+    renderClassChips();
+}
+
+async function bulkDeleteStudents(classId) {
+    const checked = getCheckedRosterNames(classId);
+    if (checked.length === 0) { showToast("Изберете поне един ученик.", "warning"); return; }
+    if (!confirm(`Сигурни ли сте, че искате трайно да изтриете ${checked.length} ученици от класа?`)) return;
+
+    const data = classesData[classId];
+    const newStudents = (data.students || []).filter(name => !checked.includes(name));
+    try {
+        await saveClassRoster(classId, data.className, newStudents);
+        showToast("Учениците бяха изтрити от класа.", "success");
+    } catch (err) {
+        showToast("Грешка при изтриване: " + err.message, "error");
+    }
+}
+
+async function bulkDeactivateStudents(classId) {
+    const checked = getCheckedRosterNames(classId);
+    if (checked.length === 0) { showToast("Изберете поне един ученик.", "warning"); return; }
+    if (!confirm(`Да се деактивират ли ${checked.length} ученици? Ще изчезнат от активния списък, но данните им се пазят.`)) return;
+
+    const data = classesData[classId];
+    const newStudents = (data.students || []).filter(name => !checked.includes(name));
+    const newInactive = [...new Set([...(data.inactiveStudents || []), ...checked])];
+    try {
+        await saveClassRoster(classId, data.className, newStudents, newInactive);
+        showToast("Учениците бяха деактивирани.", "success");
+    } catch (err) {
+        showToast("Грешка при деактивиране: " + err.message, "error");
+    }
+}
+
+async function reactivateStudent(classId, name) {
+    const data = classesData[classId];
+    const newInactive = (data.inactiveStudents || []).filter(n => n !== name);
+    const newStudents = [...new Set([...(data.students || []), name])];
+    try {
+        await saveClassRoster(classId, data.className, newStudents, newInactive);
+        showToast(`${name} е активиран отново.`, "success");
+    } catch (err) {
+        showToast("Грешка при активиране: " + err.message, "error");
+    }
+}
+
+async function bulkMoveStudents(classId) {
+    const targetClassId = document.getElementById(`move-target-${classId}`).value;
+    if (!targetClassId) { showToast("Изберете целеви клас.", "warning"); return; }
+    const checked = getCheckedRosterNames(classId);
+    if (checked.length === 0) { showToast("Изберете поне един ученик.", "warning"); return; }
+
+    const sourceData = classesData[classId];
+    const targetData = classesData[targetClassId];
+    if (!confirm(`Да се преместят ли ${checked.length} ученици в клас "${targetData.className}"?`)) return;
+
+    const newSourceStudents = (sourceData.students || []).filter(name => !checked.includes(name));
+    const newTargetStudents = [...new Set([...(targetData.students || []), ...checked])];
+
+    try {
+        await saveClassRoster(classId, sourceData.className, newSourceStudents);
+        await saveClassRoster(targetClassId, targetData.className, newTargetStudents);
+        showToast("Учениците бяха преместени.", "success");
+    } catch (err) {
+        showToast("Грешка при преместване: " + err.message, "error");
+    }
 }
 
 // Претърсва локално кешираните класове по име или ID
@@ -239,7 +469,8 @@ function filterClassesBySearch() {
 
 // Добавя новосъздаден/обновен клас директно в интерфейса, без да разбърква реда на таблицата
 function upsertClassInUI(classId, className, students) {
-    classesData[classId] = { className, students };
+    const previousInactive = (classesData[classId] && classesData[classId].inactiveStudents) || [];
+    classesData[classId] = { className, students, inactiveStudents: previousInactive };
 
     const addOptionIfMissing = (selectEl) => {
         if (!selectEl) return;
@@ -359,7 +590,7 @@ function renderAssignmentsTable(list) {
     const assignmentsTable = document.getElementById("assignments-table-body");
     if (list.length === 0) {
         assignmentsTable.innerHTML = `
-            <tr><td colspan="4">
+            <tr><td colspan="6">
                 <div class="empty-state">
                     <div class="empty-icon"><i class="fa-solid fa-inbox"></i></div>
                     <h4>Няма създадени задачи</h4>
@@ -393,10 +624,18 @@ function buildStudentLink(assignmentId) {
 // Маркъп на един ред в таблицата със задачи, включително уникалния линк за ученици
 function renderAssignmentRow(a) {
     const studentUrl = buildStudentLink(a.id);
+    const deadlineText = a.deadline ? formatSubmittedAt(a.deadline) : '<span class="stat-sub">Няма</span>';
+    const materialsIcons = [
+        a.reference_file_url ? `<a href="${a.reference_file_url}" target="_blank" rel="noopener" class="btn-icon" title="Помощен файл"><i class="fa-regular fa-file"></i></a>` : '',
+        a.reference_link ? `<a href="${a.reference_link}" target="_blank" rel="noopener" class="btn-icon" title="Помощен линк"><i class="fa-solid fa-link"></i></a>` : ''
+    ].filter(Boolean).join('') || '<span class="stat-sub">—</span>';
+
     return `
         <tr id="assignment-row-${a.id}">
             <td><strong>${a.title}</strong></td>
             <td>${a.group_id || a.class_id || ''}</td>
+            <td>${deadlineText}</td>
+            <td>${materialsIcons}</td>
             <td><a href="${studentUrl}" target="_blank" class="task-link">${studentUrl}</a></td>
             <td>
                 <button type="button" class="btn-icon" onclick="copyAssignmentLink('${a.id}')" title="Копирай линка"><i class="fa-regular fa-copy"></i></button>
@@ -496,22 +735,38 @@ document.getElementById("create-class-form")?.addEventListener("submit", async (
 });
 
 // Добавяне на нова задача
+// Показва/скрива полето за име на шаблон според чекбокса "Запази като шаблон"
+document.getElementById("assign-save-as-template")?.addEventListener("change", (e) => {
+    document.getElementById("assign-template-title").style.display = e.target.checked ? "block" : "none";
+});
+
 document.getElementById("create-assignment-form")?.addEventListener("submit", async (e) => {
     e.preventDefault();
     const group_id = document.getElementById("assign-group-select").value;
     const title = document.getElementById("assign-title").value.trim();
     const fileInput = document.getElementById("criteria-file-input");
+    const templateId = document.getElementById("assign-template-select").value;
+    const deadline = document.getElementById("assign-deadline").value;
+    const referenceLink = document.getElementById("assign-reference-link").value.trim();
+    const referenceFileInput = document.getElementById("assign-reference-file");
+    const saveAsTemplate = document.getElementById("assign-save-as-template").checked;
+    const templateTitle = document.getElementById("assign-template-title").value.trim();
 
     const formData = new FormData();
     formData.append("group_id", group_id);
     formData.append("title", title);
-    
+
     // ДОБАВЕНО: Винаги изпращаме празен JSON за критерии, за да предотвратим 422 грешки от FastAPI
     formData.append("criteria_json", "{}");
-    
-    if (fileInput.files.length > 0) {
+
+    if (templateId) {
+        formData.append("template_id", templateId);
+    } else if (fileInput.files.length > 0) {
         formData.append("criteria_file", fileInput.files[0]);
     }
+    if (deadline) formData.append("deadline", deadline);
+    if (referenceLink) formData.append("reference_link", referenceLink);
+    if (referenceFileInput.files.length > 0) formData.append("reference_file", referenceFileInput.files[0]);
 
     try {
         const response = await fetch(`${API_URL}/admin/assignments`, {
@@ -526,8 +781,8 @@ document.getElementById("create-assignment-form")?.addEventListener("submit", as
                 const errData = await response.json();
                 if (errData.detail) {
                     // Ако грешката е валидационна (масив от липсващи полета), я форматираме
-                    errorDetail = Array.isArray(errData.detail) 
-                        ? errData.detail.map(err => err.msg).join(", ") 
+                    errorDetail = Array.isArray(errData.detail)
+                        ? errData.detail.map(err => err.msg).join(", ")
                         : errData.detail;
                 }
             } catch (_) {
@@ -536,8 +791,26 @@ document.getElementById("create-assignment-form")?.addEventListener("submit", as
             throw new Error(errorDetail);
         }
 
+        const result = await response.json();
+
+        // Ако е поискано запазване като шаблон, взимаме реално записаните критерии
+        // (след парсване на Word файла или от избрания шаблон) и ги пазим за бъдеще
+        if (saveAsTemplate && templateTitle) {
+            try {
+                const createdAssignment = await (await fetch(`${API_URL}/assignments/${encodeURIComponent(result.assignment_id)}`)).json();
+                const templateForm = new FormData();
+                templateForm.append("title", templateTitle);
+                templateForm.append("criteria_json", JSON.stringify(createdAssignment.criteria || {}));
+                await fetch(`${API_URL}/admin/templates`, { method: "POST", body: templateForm });
+                await loadTemplates();
+            } catch (tplErr) {
+                console.error("Грешка при запазване на шаблона:", tplErr);
+            }
+        }
+
         showToast("Задачата е създадена успешно!", "success");
         document.getElementById("create-assignment-form").reset();
+        document.getElementById("assign-template-title").style.display = "none";
 
         const currentFilter = document.getElementById("filter-assignments-class").value;
         await loadAssignments(currentFilter);
@@ -711,6 +984,9 @@ function renderSubmissionsTable() {
     tbody.innerHTML = pageItems.map((sub, i) => {
         const index = start + i;
         const statusBadge = '<i class="fa-solid fa-check"></i> Проверено';
+        const lateBadge = sub.is_late
+            ? '<span class="badge-status grade-badge grade-low" style="margin-left:6px;"><i class="fa-regular fa-clock"></i> Закъснял</span>'
+            : '';
         const taskTitle = assignmentTitleById[sub.assignment_id] || (sub.assignment_id ? sub.assignment_id : '—');
         const studentName = sub.student_name || 'Неизвестен';
         const submittedAt = formatSubmittedAt(sub.created_at);
@@ -736,7 +1012,7 @@ function renderSubmissionsTable() {
                 <td>${submittedAt}</td>
                 <td><strong>${sub.score || 0}</strong> / ${sub.max_score || 100} точки</td>
                 <td>${gradeCell}</td>
-                <td><span class="badge-status">${statusBadge}</span></td>
+                <td><span class="badge-status">${statusBadge}</span>${lateBadge}</td>
                 <td onclick="event.stopPropagation();">${fileActions}<button type="button" class="btn-danger-icon" onclick="deleteSubmission(${sub.id})" title="Изтрий предаването"><i class="fa-regular fa-trash-can"></i></button></td>
             </tr>
             <tr class="submission-detail-row" id="${detailRowId}" hidden>

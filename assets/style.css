@@ -1,0 +1,86 @@
+body {
+    font-family: 'Comic Sans MS', cursive, sans-serif; 
+    background-color: #f0f8ff;
+    text-align: center;
+}
+
+.header {
+    background-color: #ffcc00;
+    padding: 10px; /* Намалено от 20px на 10px */
+    box-shadow: 0 4px 8px rgba(0, 0, 0, 0.2);
+    border-radius: 15px;
+    margin-bottom: 20px; /* Намалено от 30px на 20px */
+}
+
+h1 {
+    color: #333;
+    font-size: 1.8rem; /* Намален от 2.5rem на 1.8rem */
+}
+
+.student {
+    display: inline-block;
+    margin: 20px;
+    text-align: center;
+}
+
+.avatar {
+    width: 100px;
+    height: 100px;
+    border-radius: 50%;
+    box-shadow: 0px 4px 10px rgba(0, 0, 0, 0.3);
+    transition: transform 0.3s ease-in-out;
+}
+
+.avatar:hover {
+    transform: scale(1.1);
+}
+
+.status-button {
+    padding: 15px 25px;
+    font-size: 18px;
+    font-weight: bold;
+    color: #fff;
+    cursor: pointer;
+    border-radius: 50px;
+    border: none;
+    outline: none;
+    background-color: red;
+    transition: background-color 0.4s ease, transform 0.3s;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    margin-top: 10px;
+}
+
+.status-button.absent {
+    background-color: #ff4d4d;
+}
+
+.status-button.present {
+    background-color: #4CAF50;
+}
+
+.status-button.present:before {
+    content: "" ;
+}
+
+.status-button:hover {
+    transform: scale(1.05);
+}
+
+.pulse {
+    animation: pulse 0.4s;
+}
+
+@keyframes pulse {
+    0% {
+        transform: scale(1);
+    }
+    50% {
+        transform: scale(1.2);
+    }
+    100% {
+        transform: scale(1);
+}
+
+}

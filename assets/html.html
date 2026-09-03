@@ -1,0 +1,105 @@
+<!DOCTYPE html>
+<html lang="bg">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Присъствие на ученици</title>
+    <link rel="stylesheet" href="style.css">
+</head>
+<body>
+    <div class="header">
+        <h1>Присъствие на 5Б</h1>
+    </div>
+    
+    <div class="student" id="student1">
+        <img src="girl.png" alt="Ученик 1" class="avatar">
+        <button class="status-button absent" onclick="toggleAttendance(this)"> Елена Антонова</button>
+    </div>
+
+    <div class="student" id="student2">
+        <img src="girl.png" alt="Ученик 2" class="avatar">
+        <button class="status-button absent" onclick="toggleAttendance(this)">Елена Цветанова</button>
+    </div>
+
+    <div class="student" id="student3">
+        <img src="boy.png" alt="Ученик 3" class="avatar">
+        <button class="status-button absent" onclick="toggleAttendance(this)">Ефтим Петров</button>
+    </div>
+
+    <div class="student" id="student4">
+        <img src="girl.png" alt="Ученик 4" class="avatar">
+        <button class="status-button absent" onclick="toggleAttendance(this)">Зара Кисимова</button>
+    </div>
+
+    <div class="student" id="student5">
+        <img src="boy.png" alt="Ученик 5" class="avatar">
+        <button class="status-button absent" onclick="toggleAttendance(this)">Златомир Ганев</button>
+    </div>
+
+    <div class="student" id="student6">
+        <img src="boy.png" alt="Ученик 6" class="avatar">
+        <button class="status-button absent" onclick="toggleAttendance(this)">Ивайло Войнов</button>
+    </div>
+
+    <div class="student" id="student7">
+        <img src="girl.png" alt="Ученик 7" class="avatar">
+        <button class="status-button absent" onclick="toggleAttendance(this)">Иванина Гелова</button>
+    </div>
+
+    <div class="student" id="student8">
+        <img src="girl.png" alt="Ученик 8" class="avatar">
+        <button class="status-button absent" onclick="toggleAttendance(this)">Иванина Палакарчева</button>
+    </div>
+
+    <div class="student" id="student9">
+        <img src="boy.png" alt="Ученик 9" class="avatar">
+        <button class="status-button absent" onclick="toggleAttendance(this)">Марио Недков</button>
+    </div>
+
+    <div class="student" id="student10">
+        <img src="boy.png" alt="Ученик 10" class="avatar">
+        <button class="status-button absent" onclick="toggleAttendance(this)">Мартин Неков</button>
+    </div>
+
+    <div class="student" id="student11">
+        <img src="girl.png" alt="Ученик 11" class="avatar">
+        <button class="status-button absent" onclick="toggleAttendance(this)">Моника Кръстева</button>
+    </div>
+
+    <div class="student" id="student12">
+        <img src="boy.png" alt="Ученик 12" class="avatar">
+        <button class="status-button absent" onclick="toggleAttendance(this)">Петър Моние</button>
+    </div>
+
+    <div class="student" id="student13">
+        <img src="girl.png" alt="Ученик 13" class="avatar">
+        <button class="status-button absent" onclick="toggleAttendance(this)">Рая Куртева</button>
+    </div>
+
+    <div class="student" id="student14">
+        <img src="girl.png" alt="Ученик 14" class="avatar">
+        <button class="status-button absent" onclick="toggleAttendance(this)">Силвия Давидова</button>
+    </div>
+
+    <div class="student" id="student15">
+        <img src="girl.png" alt="Ученик 15" class="avatar">
+        <button class="status-button absent" onclick="toggleAttendance(this)">Сияна Петкова</button>
+    </div>
+
+    <script>
+        function toggleAttendance(button) {
+            if (button.classList.contains('present')) {
+                button.classList.remove('present');
+                button.classList.add('absent');
+                button.innerHTML = button.innerHTML.replace('<br>(Присъства)', '');
+            } else {
+                button.classList.remove('absent');
+                button.classList.add('present');
+                button.innerHTML += '<br>(Присъства)';;
+            }
+            button.classList.add('pulse');
+            setTimeout(() => button.classList.remove('pulse'), 500);
+        }
+    </script>
+</body>
+</html>

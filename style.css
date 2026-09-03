@@ -224,60 +224,75 @@ body {
     margin-top: 0;
 }
 
-/* Решетка с карти на учениците за присъствие - аватар (кръг с "лице") + единично
-   "хапче"-бутон с името, оцветено по статус (зелено/червено) - според референтния дизайн */
+/* Присъствие - следва досущ референтния дизайн (playful, Comic Sans, жълт хедър-бадж,
+   кръгли илюстрирани аватари, едно "хапче"-копче с името, оцветено по статус) */
+#sec-attendance {
+    font-family: 'Comic Sans MS', cursive, sans-serif;
+}
+
+.attendance-header-badge {
+    background-color: #ffcc00;
+    padding: 14px 22px;
+    box-shadow: 0 4px 8px rgba(0, 0, 0, 0.2);
+    border-radius: 15px;
+    display: inline-block;
+    margin-bottom: 6px;
+}
+
+.attendance-header-badge h1 {
+    color: #333;
+    font-size: 1.8rem;
+    margin: 0;
+}
+
 .attendance-card-grid {
     display: grid;
-    grid-template-columns: repeat(auto-fill, minmax(120px, 1fr));
-    gap: 24px 16px;
-    padding: 10px 20px 24px;
+    grid-template-columns: repeat(auto-fill, minmax(130px, 1fr));
+    gap: 28px 16px;
+    padding: 14px 20px 26px;
 }
 
 .attendance-card {
     display: flex;
     flex-direction: column;
     align-items: center;
-    gap: 10px;
     text-align: center;
 }
 
 .attendance-avatar-wrap {
-    width: 84px;
-    height: 84px;
+    width: 100px;
+    height: 100px;
     border-radius: 50%;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    font-size: 34px;
-    color: #fff;
-    flex-shrink: 0;
-    box-shadow: 0 4px 10px rgba(0, 0, 0, 0.18);
+    box-shadow: 0px 4px 10px rgba(0, 0, 0, 0.3);
     transition: transform 0.3s ease-in-out;
+    overflow: hidden;
+    flex-shrink: 0;
+}
+
+.attendance-avatar-wrap svg {
+    display: block;
+    width: 100%;
+    height: 100%;
 }
 
 .attendance-avatar-wrap:hover {
     transform: scale(1.1);
 }
 
-.attendance-avatar-wrap.a0 { background: linear-gradient(135deg, #93c5fd, #3b82f6); }
-.attendance-avatar-wrap.a1 { background: linear-gradient(135deg, #86efac, #16a34a); }
-.attendance-avatar-wrap.a2 { background: linear-gradient(135deg, #fcd34d, #f59e0b); }
-.attendance-avatar-wrap.a3 { background: linear-gradient(135deg, #f9a8d4, #ec4899); }
-.attendance-avatar-wrap.a4 { background: linear-gradient(135deg, #7dd3fc, #0ea5e9); }
-
 .status-button {
-    padding: 10px 16px;
-    font-size: 13px;
-    font-weight: 700;
-    line-height: 1.4;
+    padding: 12px 22px;
+    font-size: 15px;
+    font-weight: bold;
+    line-height: 1.35;
     color: #fff;
     cursor: pointer;
-    border-radius: 999px;
+    border-radius: 50px;
     border: none;
     outline: none;
-    background-color: #ef4444;
-    transition: background-color 0.3s ease, transform 0.2s;
-    max-width: 150px;
+    background-color: #ff4d4d;
+    transition: background-color 0.4s ease, transform 0.3s;
+    margin-top: 10px;
+    max-width: 160px;
 }
 
 .status-button:hover {
@@ -285,20 +300,20 @@ body {
 }
 
 .status-button.present {
-    background-color: #16a34a;
+    background-color: #4CAF50;
 }
 
 .status-button.absent {
-    background-color: #ef4444;
+    background-color: #ff4d4d;
 }
 
 .status-button.pulse {
-    animation: card-pulse 0.4s ease;
+    animation: card-pulse 0.4s;
 }
 
 @keyframes card-pulse {
     0% { transform: scale(1); }
-    50% { transform: scale(1.15); }
+    50% { transform: scale(1.2); }
     100% { transform: scale(1); }
 }
 

@@ -852,6 +852,7 @@ async function loadAttendanceData() {
 
     const data = classesData[lockedClassId];
     const className = data ? data.className : lockedClassId;
+    document.getElementById("attendance-title").textContent = `Присъствие на ${className}`;
     document.getElementById("attendance-subtitle").textContent = `Клас: ${className}`;
     document.getElementById("attendance-list-title").textContent = `Ученици в клас ${className}`;
 
@@ -873,6 +874,47 @@ function effectiveAttendanceStatus(name, statusByName) {
     return statusByName[name] === 'present' ? 'present' : 'absent';
 }
 
+// Илюстрирани аватари (момиче/момче) вместо снимка - вградени директно като SVG, защото
+// качените в чата картинки не могат да се запазят като файлове в проекта
+const AVATAR_SVG_GIRL = `<svg viewBox="0 0 100 100" xmlns="http://www.w3.org/2000/svg">
+    <circle cx="50" cy="50" r="50" fill="#FCE38A"/>
+    <path d="M18 58 Q8 74 14 92 Q22 94 26 86 Q19 72 27 60 Z" fill="#7a3b12"/>
+    <path d="M82 58 Q92 74 86 92 Q78 94 74 86 Q81 72 73 60 Z" fill="#7a3b12"/>
+    <path d="M24 46 Q22 14 50 13 Q78 14 76 46 Q74 33 50 30 Q26 33 24 46 Z" fill="#7a3b12"/>
+    <circle cx="50" cy="53" r="27" fill="#FBD3B4"/>
+    <path d="M22 100 Q24 76 50 76 Q76 76 78 100 Z" fill="#5b2c82"/>
+    <path d="M37 80 L50 92 L63 80 L59 100 L41 100 Z" fill="#ffffff"/>
+    <circle cx="34" cy="58" r="5" fill="#f7a48c" opacity="0.55"/>
+    <circle cx="66" cy="58" r="5" fill="#f7a48c" opacity="0.55"/>
+    <path d="M37 49 Q41 44 45 49" stroke="#4a2f18" stroke-width="2.6" fill="none" stroke-linecap="round"/>
+    <path d="M55 49 Q59 44 63 49" stroke="#4a2f18" stroke-width="2.6" fill="none" stroke-linecap="round"/>
+    <path d="M41 62 Q50 69 59 62" stroke="#b5654a" stroke-width="2.6" fill="none" stroke-linecap="round"/>
+</svg>`;
+
+const AVATAR_SVG_BOY = `<svg viewBox="0 0 100 100" xmlns="http://www.w3.org/2000/svg">
+    <circle cx="50" cy="50" r="50" fill="#FCE38A"/>
+    <path d="M20 46 Q18 15 50 14 Q82 15 80 46 Q76 28 50 28 Q24 28 20 46 Z" fill="#2b2b3a"/>
+    <path d="M20 40 Q15 48 19 54 L26 48 Z" fill="#2b2b3a"/>
+    <path d="M80 40 Q85 48 81 54 L74 48 Z" fill="#2b2b3a"/>
+    <circle cx="50" cy="55" r="27" fill="#FBD3B4"/>
+    <path d="M22 100 Q24 74 50 74 Q76 74 78 100 Z" fill="#ffffff"/>
+    <path d="M22 100 L37 80 L50 90 Z" fill="#e53935"/>
+    <path d="M78 100 L63 80 L50 90 Z" fill="#e53935"/>
+    <circle cx="33" cy="60" r="5" fill="#f7a48c" opacity="0.55"/>
+    <circle cx="67" cy="60" r="5" fill="#f7a48c" opacity="0.55"/>
+    <circle cx="40" cy="52" r="3" fill="#2b2b3a"/>
+    <circle cx="60" cy="52" r="3" fill="#2b2b3a"/>
+    <path d="M39 63 Q50 73 61 63 Q50 68 39 63 Z" fill="#8a3b2c"/>
+</svg>`;
+
+// Без реални данни за пол, отгатва по края на първото име (по бълг. имена, обикновено
+// завършващи на "а"/"я" за женски род) - чисто козметичен избор на аватар
+function guessAvatarSvg(name) {
+    const firstName = (name || "").trim().split(/\s+/)[0] || "";
+    const lastChar = firstName.slice(-1).toLowerCase();
+    return (lastChar === "а" || lastChar === "я") ? AVATAR_SVG_GIRL : AVATAR_SVG_BOY;
+}
+
 function renderAttendanceList() {
     if (!lockedClassId) return;
     const data = classesData[lockedClassId] || { students: [] };
@@ -884,14 +926,12 @@ function renderAttendanceList() {
     if (students.length === 0) {
         container.innerHTML = `<p class="stat-sub" style="padding:12px;">Няма ученици в този клас.</p>`;
     } else {
-        container.innerHTML = students.map((name, index) => {
+        container.innerHTML = students.map((name) => {
             const status = effectiveAttendanceStatus(name, statusByName);
             const buttonText = status === 'present' ? `${name}<br>(Присъства)` : name;
             return `
                 <div class="attendance-card">
-                    <div class="attendance-avatar-wrap a${index % 5}" title="${escapeJsString(name)}">
-                        <i class="fa-solid fa-face-smile"></i>
-                    </div>
+                    <div class="attendance-avatar-wrap" title="${escapeJsString(name)}">${guessAvatarSvg(name)}</div>
                     <button type="button" class="status-button ${status}" data-student-name="${escapeJsString(name)}" onclick="toggleAttendanceCard('${escapeJsString(name)}')">${buttonText}</button>
                 </div>
             `;

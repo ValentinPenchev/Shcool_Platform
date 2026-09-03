@@ -243,10 +243,43 @@ function applyWorkspaceLock() {
         const name = data.className || lockedClassId;
         document.getElementById("workspace-class-name").textContent = name;
         document.getElementById("workspace-class-badge").textContent = name.slice(0, 2);
+        renderWorkspaceClassMenu();
     }
 
     renderClassesAccordionList();
 }
+
+// Падащо меню в горната лента на работния панел - позволява смяна на класа без излизане от него
+function renderWorkspaceClassMenu() {
+    const menu = document.getElementById("workspace-class-menu");
+    if (!menu) return;
+    menu.innerHTML = Object.entries(classesData).map(([classId, data]) => `
+        <button type="button" class="${classId === lockedClassId ? 'active' : ''}" onclick="switchWorkspaceClass('${classId}')">${data.className}</button>
+    `).join("");
+}
+
+function toggleWorkspaceClassMenu() {
+    const wrap = document.getElementById("workspace-class-switcher");
+    const menu = document.getElementById("workspace-class-menu");
+    const expanded = wrap.classList.toggle("expanded");
+    menu.hidden = !expanded;
+}
+
+function switchWorkspaceClass(classId) {
+    document.getElementById("workspace-class-switcher").classList.remove("expanded");
+    document.getElementById("workspace-class-menu").hidden = true;
+    const currentTab = document.querySelector(".workspace-tab.active");
+    enterClassWorkspace(classId);
+    if (currentTab) showSection(currentTab.dataset.tab);
+}
+
+document.addEventListener("click", (e) => {
+    const wrap = document.getElementById("workspace-class-switcher");
+    if (wrap && wrap.classList.contains("expanded") && !wrap.contains(e.target)) {
+        wrap.classList.remove("expanded");
+        document.getElementById("workspace-class-menu").hidden = true;
+    }
+});
 
 function enterClassWorkspace(classId) {
     lockedClassId = classId;
@@ -264,6 +297,44 @@ function exitClassWorkspace() {
     renderClassChips();
     showSection('dashboard');
 }
+
+// "Табло" в страничната лента - излиза от работния панел на класа и показва общата статистика
+function goToOverview() {
+    lockedClassId = null;
+    applyWorkspaceLock();
+    renderClassChips();
+    showSection('dashboard');
+}
+
+// Присъствие/Емоциометър от страничната лента - изискват заключен клас,
+// затова ако все още няма избран клас се влиза автоматично в първия наличен
+function goToClassScopedSection(sectionId) {
+    if (!lockedClassId) {
+        const firstClassId = Object.keys(classesData)[0];
+        if (!firstClassId) {
+            showToast("Първо добавете клас, за да ползвате тази секция.", "error");
+            return;
+        }
+        lockedClassId = firstClassId;
+        applyWorkspaceLock();
+    }
+    showSection(sectionId);
+}
+
+function toggleAccountMenu() {
+    const wrap = document.getElementById("sidebar-account");
+    const menu = document.getElementById("sidebar-account-menu");
+    const expanded = wrap.classList.toggle("expanded");
+    menu.hidden = !expanded;
+}
+
+document.addEventListener("click", (e) => {
+    const wrap = document.getElementById("sidebar-account");
+    if (wrap && wrap.classList.contains("expanded") && !wrap.contains(e.target)) {
+        wrap.classList.remove("expanded");
+        document.getElementById("sidebar-account-menu").hidden = true;
+    }
+});
 
 // Превключване между секциите в интерфейса
 function showSection(sectionId) {
@@ -1486,10 +1557,9 @@ async function loadDashboardData() {
         submissions.sort((a, b) => new Date(b.created_at || 0) - new Date(a.created_at || 0));
         submissionsCache = submissions;
 
-        let totalStudentsCount = 0;
-        if (classId && classesData[classId]) {
-            totalStudentsCount = (classesData[classId].students || []).length;
-        }
+        const totalStudentsCount = classId && classesData[classId]
+            ? (classesData[classId].students || []).length
+            : Object.values(classesData).reduce((sum, c) => sum + (c.students || []).length, 0);
 
         const submittedCount = submissions.length;
         document.getElementById("stat-count").innerText = submittedCount;
@@ -1508,11 +1578,19 @@ async function loadDashboardData() {
         document.getElementById("stat-avg-sub").innerText = `${avgScore}/${avgMaxPoints} точки`;
         updateAverageRing(avgScore);
 
+        document.getElementById("stat-excellent").innerText = submissions.filter(s => s.grade === 6).length;
+        document.getElementById("stat-late").innerText = submissions.filter(s => s.is_late).length;
+
+        const uniqueSubmittedStudents = new Set(submissions.map(s => s.student_name)).size;
+        document.getElementById("stat-missing").innerText = Math.max(0, totalStudentsCount - uniqueSubmittedStudents);
+
         const searchInput = document.getElementById("submissions-search");
         if (searchInput) searchInput.value = "";
         submissionsCurrentPage = 1;
         renderSubmissionsTable();
         renderCriteriaBreakdown();
+        renderGradeDonutChart();
+        renderRecentActivity();
     } catch (err) {
         console.error("Грешка при зареждане на таблото:", err);
     }
@@ -1568,6 +1646,98 @@ function updateAverageRing(avgScore) {
     circle.style.strokeDasharray = `${circumference}`;
     circle.style.strokeDashoffset = `${offset}`;
     label.textContent = `${avgScore}%`;
+}
+
+// Кръгова диаграма с разпределението на оценките сред текущо филтрираните предавания
+const GRADE_DONUT_COLORS = { 6: "#16a34a", 5: "#0ea5e9", 4: "#f59e0b", 3: "#ea580c", 2: "#dc2626", none: "#94a3b8" };
+const GRADE_DONUT_LABELS = { 6: "Отличен (6)", 5: "Много добър (5)", 4: "Добър (4)", 3: "Среден (3)", 2: "Слаб (2)", none: "Без оценка" };
+
+function renderGradeDonutChart() {
+    const chart = document.getElementById("grade-donut-chart");
+    const legend = document.getElementById("grade-donut-legend");
+    const totalLabel = document.getElementById("grade-donut-total");
+    if (!chart || !legend) return;
+
+    const counts = { 6: 0, 5: 0, 4: 0, 3: 0, 2: 0, none: 0 };
+    submissionsCache.forEach(sub => {
+        const key = [6, 5, 4, 3, 2].includes(sub.grade) ? sub.grade : "none";
+        counts[key]++;
+    });
+
+    const total = submissionsCache.length;
+    totalLabel.textContent = total;
+
+    const order = [6, 5, 4, 3, 2, "none"].filter(key => counts[key] > 0);
+    if (order.length === 0) {
+        chart.style.background = "var(--surface-alt)";
+        legend.innerHTML = `<span class="stat-sub">Няма данни за текущия филтър.</span>`;
+        return;
+    }
+
+    let offset = 0;
+    const stops = order.map(key => {
+        const pct = (counts[key] / total) * 100;
+        const segment = `${GRADE_DONUT_COLORS[key]} ${offset}% ${offset + pct}%`;
+        offset += pct;
+        return segment;
+    });
+    chart.style.background = `conic-gradient(${stops.join(", ")})`;
+
+    legend.innerHTML = order.map(key => `
+        <div class="donut-legend-item">
+            <span class="donut-legend-dot" style="background:${GRADE_DONUT_COLORS[key]}"></span>
+            <span>${GRADE_DONUT_LABELS[key]}</span>
+            <span class="donut-legend-count">${counts[key]}</span>
+        </div>
+    `).join("");
+}
+
+// Списък с последно предадените задачи (submissionsCache вече е сортиран по дата - най-новите отгоре)
+function renderRecentActivity() {
+    const list = document.getElementById("recent-activity-list");
+    if (!list) return;
+
+    const recent = submissionsCache.slice(0, 6);
+    if (recent.length === 0) {
+        list.innerHTML = `<span class="stat-sub">Няма предадени решения все още.</span>`;
+        return;
+    }
+
+    list.innerHTML = recent.map((sub, i) => {
+        const studentName = sub.student_name || "Неизвестен";
+        const taskTitle = assignmentTitleById[sub.assignment_id] || (sub.assignment_id || "—");
+        const pct = sub.max_score ? Math.round(((sub.score || 0) / sub.max_score) * 100) : (sub.score || 0);
+        const tier = pct >= 85 ? "grade-high" : (pct >= 60 ? "grade-mid" : "grade-low");
+        return `
+            <div class="recent-activity-row" onclick="toggleSubmissionDetails(${sub.id})">
+                <span class="row-avatar a${i % 5} no-margin">${studentName.slice(0, 1).toUpperCase()}</span>
+                <div class="recent-activity-name">
+                    <strong>${studentName}</strong>
+                    <span>${taskTitle}</span>
+                </div>
+                <span class="badge-status grade-badge ${tier}">${pct}%</span>
+                <span class="recent-activity-time">${formatRelativeTime(sub.created_at)}</span>
+                <i class="fa-solid fa-chevron-right chevron"></i>
+            </div>
+        `;
+    }).join("");
+}
+
+// Форматира дата като относително време ("преди 5 мин", "вчера", "12.03.2026")
+function formatRelativeTime(dateStr) {
+    if (!dateStr) return "—";
+    const d = new Date(dateStr);
+    if (isNaN(d.getTime())) return "—";
+    const diffMs = Date.now() - d.getTime();
+    const diffMin = Math.floor(diffMs / 60000);
+    if (diffMin < 1) return "току-що";
+    if (diffMin < 60) return `преди ${diffMin} мин`;
+    const diffHours = Math.floor(diffMin / 60);
+    if (diffHours < 24) return `преди ${diffHours} ч`;
+    const diffDays = Math.floor(diffHours / 24);
+    if (diffDays === 1) return "вчера";
+    if (diffDays < 7) return `преди ${diffDays} дни`;
+    return formatSubmittedAt(dateStr).split(" ")[0];
 }
 
 // Претърсва кешираните предавания по име на ученик

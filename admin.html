@@ -29,15 +29,12 @@
         <!-- ЛЯВА НАВИГАЦИОННА ЛЕНТА -->
         <aside class="sidebar" id="sidebar">
             <div class="sidebar-brand">
-                <i class="fa-solid fa-book-open brand-icon"></i>
+                <img src="assets/logo.png" alt="VPClassroom" class="brand-logo">
                 <h2>VPClassroom</h2>
             </div>
 
             <ul class="sidebar-menu">
-                <li id="menu-dashboard" class="active"><a href="#" onclick="showSection('dashboard')"><i class="fa-solid fa-chart-line"></i> Статистика</a></li>
-                <li id="menu-assignments"><a href="#" onclick="showSection('assignments')"><i class="fa-regular fa-clipboard"></i> Задачи</a></li>
-                <li id="menu-exercises"><a href="#" onclick="showSection('exercises')"><i class="fa-solid fa-dumbbell"></i> Упражнения</a></li>
-                <li id="menu-classes"><a href="#" onclick="showSection('classes')"><i class="fa-solid fa-user-group"></i> Ученици</a></li>
+                <li id="menu-home"><a href="#" onclick="goToOverview()"><i class="fa-solid fa-house"></i> Табло</a></li>
                 <li id="menu-classes-accordion" class="sidebar-accordion">
                     <a href="#" onclick="toggleClassesAccordion(); return false;">
                         <i class="fa-solid fa-layer-group"></i> Класове
@@ -45,25 +42,47 @@
                     </a>
                     <ul class="sidebar-submenu" id="classes-accordion-list" hidden></ul>
                 </li>
+                <li id="menu-dashboard" class="active"><a href="#" onclick="showSection('dashboard')"><i class="fa-solid fa-chart-line"></i> Статистика</a></li>
+                <li id="menu-assignments"><a href="#" onclick="showSection('assignments')"><i class="fa-regular fa-clipboard"></i> Задачи</a></li>
+                <li id="menu-exercises"><a href="#" onclick="showSection('exercises')"><i class="fa-solid fa-dumbbell"></i> Упражнения</a></li>
+                <li id="menu-classes"><a href="#" onclick="showSection('classes')"><i class="fa-solid fa-user-group"></i> Ученици</a></li>
+                <li id="menu-attendance"><a href="#" onclick="goToClassScopedSection('attendance')"><i class="fa-solid fa-clipboard-check"></i> Присъствие</a></li>
+                <li id="menu-emotions"><a href="#" onclick="goToClassScopedSection('emotions')"><i class="fa-regular fa-face-smile"></i> Емоциометър</a></li>
             </ul>
 
-            <button type="button" class="theme-toggle-btn" id="theme-toggle-btn" onclick="toggleTheme()">
-                <i class="fa-solid fa-moon" id="theme-toggle-icon"></i>
-                <span id="theme-toggle-label">Тъмна тема</span>
-            </button>
-            <button type="button" class="theme-toggle-btn" onclick="adminLogout()" style="margin-top:8px;">
-                <i class="fa-solid fa-right-from-bracket"></i>
-                <span>Изход</span>
-            </button>
+            <ul class="sidebar-menu sidebar-menu-bottom">
+                <li id="menu-settings"><a href="#" onclick="showSection('settings')"><i class="fa-solid fa-gear"></i> Настройки</a></li>
+            </ul>
+
+            <div class="sidebar-account" id="sidebar-account">
+                <button type="button" class="sidebar-account-toggle" onclick="toggleAccountMenu()">
+                    <span class="row-avatar a0 no-margin">ВП</span>
+                    <span class="sidebar-account-info">
+                        <strong>Валентин П.</strong>
+                        <span>Учител</span>
+                    </span>
+                    <i class="fa-solid fa-chevron-up sidebar-account-caret"></i>
+                </button>
+                <div class="sidebar-account-menu" id="sidebar-account-menu" hidden>
+                    <button type="button" onclick="adminLogout()">
+                        <i class="fa-solid fa-right-from-bracket"></i>
+                        <span>Изход</span>
+                    </button>
+                </div>
+            </div>
         </aside>
 
         <!-- ОСНОВНО СЪДЪРЖАНИЕ -->
         <main class="main-content">
             <!-- Работен панел на избран клас - винаги видим отгоре, докато е "заключен" клас -->
             <div id="workspace-bar" class="workspace-bar" style="display:none;">
-                <div class="workspace-bar-title">
-                    <span class="class-badge c0" id="workspace-class-badge"></span>
-                    <strong id="workspace-class-name"></strong>
+                <div class="workspace-bar-title workspace-class-switcher" id="workspace-class-switcher">
+                    <button type="button" class="workspace-class-switcher-toggle" onclick="toggleWorkspaceClassMenu()">
+                        <span class="class-badge c0" id="workspace-class-badge"></span>
+                        <strong id="workspace-class-name"></strong>
+                        <i class="fa-solid fa-chevron-down accordion-caret"></i>
+                    </button>
+                    <div class="workspace-class-menu" id="workspace-class-menu" hidden></div>
                 </div>
                 <div class="workspace-tabs">
                     <button type="button" class="workspace-tab" data-tab="dashboard" onclick="showSection('dashboard')"><i class="fa-solid fa-chart-line"></i> Статистика</button>
@@ -101,44 +120,81 @@
                     </div>
                 </div>
 
-                <div class="stats-grid">
-                    <div class="stat-card">
-                        <div class="stat-left">
-                            <div class="stat-icon blue"><i class="fa-solid fa-users"></i></div>
-                            <div class="stat-data">
-                                <span class="stat-title">Ученици с предадени задачи</span>
-                                <div class="stat-main">
-                                    <strong id="stat-count">0</strong>
-                                    <span class="stat-sub" id="stat-total-students">от 0 ученици</span>
-                                </div>
+                <div class="stats-grid stats-grid-5">
+                    <div class="stat-card compact">
+                        <div class="stat-icon blue"><i class="fa-solid fa-users"></i></div>
+                        <div class="stat-data">
+                            <span class="stat-title">Общо предадени</span>
+                            <div class="stat-main">
+                                <strong id="stat-count">0</strong>
+                                <span class="stat-sub" id="stat-total-students">от 0 ученици</span>
                             </div>
-                        </div>
-                        <div class="avatar-cluster">
-                            <span class="avatar-circle a0"><i class="fa-solid fa-user"></i></span>
-                            <span class="avatar-circle a1"><i class="fa-solid fa-user"></i></span>
-                            <span class="avatar-circle a2"><i class="fa-solid fa-user"></i></span>
-                            <span class="avatar-check"><i class="fa-solid fa-check"></i></span>
                         </div>
                     </div>
 
-                    <div class="stat-card">
-                        <div class="stat-left">
-                            <div class="stat-icon green"><i class="fa-solid fa-chart-line"></i></div>
-                            <div class="stat-data">
-                                <span class="stat-title">Среден успех</span>
-                                <div class="stat-main">
-                                    <strong id="stat-avg">0%</strong>
-                                    <span class="stat-sub" id="stat-avg-sub">0/100 точки</span>
-                                </div>
+                    <div class="stat-card compact">
+                        <div class="stat-icon green"><i class="fa-solid fa-chart-line"></i></div>
+                        <div class="stat-data">
+                            <span class="stat-title">Среден успех</span>
+                            <div class="stat-main">
+                                <strong id="stat-avg">0%</strong>
+                                <span class="stat-sub" id="stat-avg-sub">0/100 точки</span>
                             </div>
                         </div>
-                        <div class="progress-ring">
-                            <svg viewBox="0 0 64 64">
-                                <circle class="ring-track" cx="32" cy="32" r="27"></circle>
-                                <circle id="avg-ring-fill" class="ring-fill" cx="32" cy="32" r="27"></circle>
-                            </svg>
-                            <span class="progress-ring-label" id="avg-ring-label">0%</span>
+                    </div>
+
+                    <div class="stat-card compact">
+                        <div class="stat-icon amber"><i class="fa-solid fa-star"></i></div>
+                        <div class="stat-data">
+                            <span class="stat-title">Отлични (6)</span>
+                            <div class="stat-main">
+                                <strong id="stat-excellent">0</strong>
+                            </div>
                         </div>
+                    </div>
+
+                    <div class="stat-card compact">
+                        <div class="stat-icon orange"><i class="fa-regular fa-clock"></i></div>
+                        <div class="stat-data">
+                            <span class="stat-title">Закъснели</span>
+                            <div class="stat-main">
+                                <strong id="stat-late">0</strong>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="stat-card compact">
+                        <div class="stat-icon purple"><i class="fa-solid fa-user-clock"></i></div>
+                        <div class="stat-data">
+                            <span class="stat-title">Непредадени</span>
+                            <div class="stat-main">
+                                <strong id="stat-missing">0</strong>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="dashboard-charts-row">
+                    <div class="table-card">
+                        <div class="table-card-header">
+                            <h3 style="margin:0;">Разпределение на резултатите</h3>
+                        </div>
+                        <div class="donut-chart-wrap">
+                            <div class="donut-chart" id="grade-donut-chart">
+                                <div class="donut-chart-center">
+                                    <strong id="grade-donut-total">0</strong>
+                                    <span>предавания</span>
+                                </div>
+                            </div>
+                            <div class="donut-legend" id="grade-donut-legend"></div>
+                        </div>
+                    </div>
+
+                    <div class="table-card">
+                        <div class="table-card-header">
+                            <h3 style="margin:0;">Последно предадени задачи</h3>
+                        </div>
+                        <div class="recent-activity-list" id="recent-activity-list"></div>
                     </div>
                 </div>
 
@@ -569,6 +625,25 @@
                         <h3 style="margin:0;">Как се чувстваш днес? Натисни върху емоцията!</h3>
                     </div>
                     <div id="emotions-grid" class="emotions-grid"></div>
+                </div>
+            </section>
+
+            <section id="sec-settings" class="dashboard-section" style="display:none;">
+                <div class="section-header-row">
+                    <div class="section-header">
+                        <h1>Настройки</h1>
+                        <p class="subtitle" style="margin-bottom:0;">Общи настройки на панела.</p>
+                    </div>
+                </div>
+
+                <div class="table-card" style="max-width:480px;">
+                    <div class="table-card-header">
+                        <h3 style="margin:0;">Изглед</h3>
+                    </div>
+                    <button type="button" class="theme-toggle-btn" id="theme-toggle-btn" onclick="toggleTheme()" style="margin-top:0;">
+                        <i class="fa-solid fa-moon" id="theme-toggle-icon"></i>
+                        <span id="theme-toggle-label">Тъмна тема</span>
+                    </button>
                 </div>
             </section>
         </main>

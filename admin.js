@@ -867,10 +867,10 @@ async function loadAttendanceData() {
     renderAttendanceList();
 }
 
-// Ученик без запис за деня се показва като "Присъства" по подразбиране (маркират се
-// изключенията - отсъстващите), но нищо не се записва в базата, докато не се кликне
+// Ученик без запис за деня се показва като "Отсъства" по подразбиране (учителят маркира
+// присъстващите при преброяване), но нищо не се записва в базата, докато не се кликне
 function effectiveAttendanceStatus(name, statusByName) {
-    return statusByName[name] === 'absent' ? 'absent' : 'present';
+    return statusByName[name] === 'present' ? 'present' : 'absent';
 }
 
 function renderAttendanceList() {
@@ -886,13 +886,13 @@ function renderAttendanceList() {
     } else {
         container.innerHTML = students.map((name, index) => {
             const status = effectiveAttendanceStatus(name, statusByName);
-            const label = status === 'present' ? 'Присъства' : 'Отсъства';
-            const icon = status === 'present' ? 'fa-circle-check' : 'fa-circle-xmark';
+            const buttonText = status === 'present' ? `${name}<br>(Присъства)` : name;
             return `
-                <div class="attendance-card" data-student-name="${escapeJsString(name)}" onclick="toggleAttendanceCard('${escapeJsString(name)}')" title="Кликни, за да смениш статуса">
-                    <div class="attendance-card-avatar a${index % 5}">${name.slice(0, 1).toUpperCase()}</div>
-                    <div class="attendance-card-name">${name}</div>
-                    <span class="attendance-status-pill ${status}"><i class="fa-solid ${icon}"></i> ${label}</span>
+                <div class="attendance-card">
+                    <div class="attendance-avatar-wrap a${index % 5}" title="${escapeJsString(name)}">
+                        <i class="fa-solid fa-face-smile"></i>
+                    </div>
+                    <button type="button" class="status-button ${status}" data-student-name="${escapeJsString(name)}" onclick="toggleAttendanceCard('${escapeJsString(name)}')">${buttonText}</button>
                 </div>
             `;
         }).join("");
@@ -908,7 +908,7 @@ function renderAttendanceList() {
 
 function toggleAttendanceCard(name) {
     const existing = attendanceCache.find(r => r.student_name === name);
-    const currentStatus = existing ? existing.status : 'present';
+    const currentStatus = existing ? existing.status : 'absent';
     const nextStatus = currentStatus === 'present' ? 'absent' : 'present';
     setAttendance(name, nextStatus);
 }
@@ -935,10 +935,10 @@ async function setAttendance(name, status) {
 }
 
 function pulseAttendanceCard(name) {
-    const card = document.querySelector(`.attendance-card[data-student-name="${CSS.escape(name)}"]`);
-    if (!card) return;
-    card.classList.add("pulse");
-    setTimeout(() => card.classList.remove("pulse"), 400);
+    const btn = document.querySelector(`.status-button[data-student-name="${CSS.escape(name)}"]`);
+    if (!btn) return;
+    btn.classList.add("pulse");
+    setTimeout(() => btn.classList.remove("pulse"), 400);
 }
 
 async function markAllAttendance(status) {

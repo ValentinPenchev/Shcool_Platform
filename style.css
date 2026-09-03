@@ -224,88 +224,81 @@ body {
     margin-top: 0;
 }
 
-/* Решетка с карти на учениците за присъствие - аватар + цветно "хапче" статус */
+/* Решетка с карти на учениците за присъствие - аватар (кръг с "лице") + единично
+   "хапче"-бутон с името, оцветено по статус (зелено/червено) - според референтния дизайн */
 .attendance-card-grid {
     display: grid;
-    grid-template-columns: repeat(auto-fill, minmax(140px, 1fr));
-    gap: 16px;
-    padding: 6px 20px 22px;
+    grid-template-columns: repeat(auto-fill, minmax(120px, 1fr));
+    gap: 24px 16px;
+    padding: 10px 20px 24px;
 }
 
 .attendance-card {
     display: flex;
     flex-direction: column;
     align-items: center;
-    gap: 8px;
-    padding: 16px 10px 14px;
-    border: 1px solid var(--border-color);
-    border-radius: 14px;
-    background: var(--card-bg);
+    gap: 10px;
     text-align: center;
-    cursor: pointer;
-    transition: transform 0.12s ease, box-shadow 0.12s ease;
 }
 
-.attendance-card:hover {
-    transform: translateY(-2px);
-    box-shadow: 0 6px 16px rgba(0, 0, 0, 0.08);
-}
-
-.attendance-card-avatar {
-    width: 54px;
-    height: 54px;
+.attendance-avatar-wrap {
+    width: 84px;
+    height: 84px;
     border-radius: 50%;
     display: flex;
     align-items: center;
     justify-content: center;
-    font-size: 20px;
+    font-size: 34px;
     color: #fff;
     flex-shrink: 0;
+    box-shadow: 0 4px 10px rgba(0, 0, 0, 0.18);
+    transition: transform 0.3s ease-in-out;
 }
 
-.attendance-card-avatar.a0 { background: #6366f1; }
-.attendance-card-avatar.a1 { background: #16a34a; }
-.attendance-card-avatar.a2 { background: #f59e0b; }
-.attendance-card-avatar.a3 { background: #ec4899; }
-.attendance-card-avatar.a4 { background: #0ea5e9; }
+.attendance-avatar-wrap:hover {
+    transform: scale(1.1);
+}
 
-.attendance-card-name {
+.attendance-avatar-wrap.a0 { background: linear-gradient(135deg, #93c5fd, #3b82f6); }
+.attendance-avatar-wrap.a1 { background: linear-gradient(135deg, #86efac, #16a34a); }
+.attendance-avatar-wrap.a2 { background: linear-gradient(135deg, #fcd34d, #f59e0b); }
+.attendance-avatar-wrap.a3 { background: linear-gradient(135deg, #f9a8d4, #ec4899); }
+.attendance-avatar-wrap.a4 { background: linear-gradient(135deg, #7dd3fc, #0ea5e9); }
+
+.status-button {
+    padding: 10px 16px;
     font-size: 13px;
     font-weight: 700;
-    color: var(--text-dark);
-    line-height: 1.3;
-}
-
-.attendance-status-pill {
-    display: inline-flex;
-    align-items: center;
-    gap: 5px;
+    line-height: 1.4;
+    color: #fff;
+    cursor: pointer;
     border-radius: 999px;
-    padding: 4px 12px;
-    font-size: 11px;
-    font-weight: 700;
-    border: 1px solid transparent;
+    border: none;
+    outline: none;
+    background-color: #ef4444;
+    transition: background-color 0.3s ease, transform 0.2s;
+    max-width: 150px;
 }
 
-.attendance-status-pill.present {
-    background: var(--badge-green-bg);
-    color: var(--badge-green-text);
-    border-color: #16a34a;
+.status-button:hover {
+    transform: scale(1.05);
 }
 
-.attendance-status-pill.absent {
-    background: var(--badge-red-bg);
-    color: var(--badge-red-text);
-    border-color: #dc2626;
+.status-button.present {
+    background-color: #16a34a;
 }
 
-.attendance-card.pulse {
+.status-button.absent {
+    background-color: #ef4444;
+}
+
+.status-button.pulse {
     animation: card-pulse 0.4s ease;
 }
 
 @keyframes card-pulse {
     0% { transform: scale(1); }
-    50% { transform: scale(1.08); }
+    50% { transform: scale(1.15); }
     100% { transform: scale(1); }
 }
 

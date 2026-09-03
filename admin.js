@@ -344,7 +344,8 @@ async function loadClasses() {
             const className = c.group_name || c.name;
             const classStudents = c.students_json || c.students || [];
             const inactiveStudents = c.inactive_students_json || [];
-            classesData[classId] = { className, students: classStudents, inactiveStudents };
+            const avatars = c.student_avatars_json || {};
+            classesData[classId] = { className, students: classStudents, inactiveStudents, avatars };
 
             filterGroup.innerHTML += `<option value="${classId}">${className}</option>`;
             assignGroupSelect.innerHTML += `<option value="${classId}">${className}</option>`;
@@ -551,15 +552,18 @@ function getCheckedRosterNames(classId, scopeId) {
     return Array.from(scope.querySelectorAll(`.roster-checkbox[data-class="${classId}"]:checked`)).map(cb => cb.value);
 }
 
-// Записва обновен състав на класа (активни + по избор неактивни ученици) и
+// Записва обновен състав на класа (активни + по избор неактивни ученици/аватари) и
 // обновява локалния кеш и таблицата
-async function saveClassRoster(classId, className, students, inactiveStudents) {
+async function saveClassRoster(classId, className, students, inactiveStudents, avatars) {
     const formData = new FormData();
     formData.append("group_id", classId);
     formData.append("group_name", className);
     formData.append("students_json", JSON.stringify(students));
     if (inactiveStudents !== undefined) {
         formData.append("inactive_students_json", JSON.stringify(inactiveStudents));
+    }
+    if (avatars !== undefined) {
+        formData.append("avatars_json", JSON.stringify(avatars));
     }
 
     const response = await adminFetch(`${API_URL}/admin/groups`, { method: "POST", body: formData });
@@ -569,10 +573,12 @@ async function saveClassRoster(classId, className, students, inactiveStudents) {
     }
 
     const previousInactive = (classesData[classId] && classesData[classId].inactiveStudents) || [];
+    const previousAvatars = (classesData[classId] && classesData[classId].avatars) || {};
     classesData[classId] = {
         className,
         students,
-        inactiveStudents: inactiveStudents !== undefined ? inactiveStudents : previousInactive
+        inactiveStudents: inactiveStudents !== undefined ? inactiveStudents : previousInactive,
+        avatars: avatars !== undefined ? avatars : previousAvatars
     };
     renderClassesTable(Object.entries(classesData));
     renderClassChips();
@@ -669,7 +675,8 @@ function filterClassesBySearch() {
 // Добавя новосъздаден/обновен клас директно в интерфейса, без да разбърква реда на таблицата
 function upsertClassInUI(classId, className, students) {
     const previousInactive = (classesData[classId] && classesData[classId].inactiveStudents) || [];
-    classesData[classId] = { className, students, inactiveStudents: previousInactive };
+    const previousAvatars = (classesData[classId] && classesData[classId].avatars) || {};
+    classesData[classId] = { className, students, inactiveStudents: previousInactive, avatars: previousAvatars };
 
     const addOptionIfMissing = (selectEl) => {
         if (!selectEl) return;
@@ -852,7 +859,6 @@ async function loadAttendanceData() {
 
     const data = classesData[lockedClassId];
     const className = data ? data.className : lockedClassId;
-    document.getElementById("attendance-title").textContent = `Присъствие на ${className}`;
     document.getElementById("attendance-subtitle").textContent = `Клас: ${className}`;
     document.getElementById("attendance-list-title").textContent = `Ученици в клас ${className}`;
 
@@ -879,12 +885,38 @@ function effectiveAttendanceStatus(name, statusByName) {
 const AVATAR_IMG_GIRL = "assets/avatars/girl.png";
 const AVATAR_IMG_BOY = "assets/avatars/boy.png";
 
-// Без реални данни за пол, отгатва по края на първото име (по бълг. имена, обикновено
-// завършващи на "а"/"я" за женски род) - чисто козметичен избор на аватар
-function guessAvatarImage(name) {
+// Ако учителят е задал ръчно момче/момиче за ученика (чрез моливчето на аватара), това
+// има предимство; иначе - отгатва по края на първото име (бълг. имена, завършващи на
+// "а"/"я", обикновено са женски) като чисто козметично начално предположение
+function studentAvatarGender(name, classId) {
+    const override = classId && classesData[classId] && classesData[classId].avatars
+        ? classesData[classId].avatars[name]
+        : null;
+    if (override === "girl" || override === "boy") return override;
+
     const firstName = (name || "").trim().split(/\s+/)[0] || "";
     const lastChar = firstName.slice(-1).toLowerCase();
-    return (lastChar === "а" || lastChar === "я") ? AVATAR_IMG_GIRL : AVATAR_IMG_BOY;
+    return (lastChar === "а" || lastChar === "я") ? "girl" : "boy";
+}
+
+function guessAvatarImage(name, classId) {
+    return studentAvatarGender(name, classId) === "girl" ? AVATAR_IMG_GIRL : AVATAR_IMG_BOY;
+}
+
+// Превключва ръчно зададения пол на аватара за ученика и го записва трайно
+async function toggleStudentAvatar(classId, name) {
+    const data = classesData[classId];
+    if (!data) return;
+    const current = studentAvatarGender(name, classId);
+    const next = current === "boy" ? "girl" : "boy";
+    const newAvatars = { ...(data.avatars || {}), [name]: next };
+
+    try {
+        await saveClassRoster(classId, data.className, data.students || [], data.inactiveStudents, newAvatars);
+        renderAttendanceList();
+    } catch (err) {
+        showToast("Грешка при смяна на аватара: " + err.message, "error");
+    }
 }
 
 function renderAttendanceList() {
@@ -901,10 +933,18 @@ function renderAttendanceList() {
         container.innerHTML = students.map((name) => {
             const status = effectiveAttendanceStatus(name, statusByName);
             const buttonText = status === 'present' ? `${name}<br>(Присъства)` : name;
+            const safeName = escapeJsString(name);
             return `
                 <div class="attendance-card">
-                    <div class="attendance-avatar-wrap" title="${escapeJsString(name)}"><img src="${guessAvatarImage(name)}" alt="${escapeJsString(name)}" class="avatar"></div>
-                    <button type="button" class="status-button ${status}" data-student-name="${escapeJsString(name)}" onclick="toggleAttendanceCard('${escapeJsString(name)}')">${buttonText}</button>
+                    <div class="attendance-avatar-outer">
+                        <div class="attendance-avatar-wrap" title="${safeName}">
+                            <img src="${guessAvatarImage(name, lockedClassId)}" alt="${safeName}" class="avatar">
+                        </div>
+                        <button type="button" class="avatar-edit-btn" onclick="event.stopPropagation(); toggleStudentAvatar('${lockedClassId}', '${safeName}')" title="Смени момче/момиче">
+                            <i class="fa-solid fa-pen"></i>
+                        </button>
+                    </div>
+                    <button type="button" class="status-button ${status}" data-student-name="${safeName}" onclick="toggleAttendanceCard('${safeName}')">${buttonText}</button>
                 </div>
             `;
         }).join("");

@@ -123,7 +123,8 @@ async def create_or_update_group(
     group_name: str = Form(...),
     students_json: Optional[str] = Form(None),
     file: Optional[UploadFile] = File(None),
-    inactive_students_json: Optional[str] = Form(None)
+    inactive_students_json: Optional[str] = Form(None),
+    avatars_json: Optional[str] = Form(None)
 ):
     students = []
     if students_json and students_json.strip():
@@ -162,6 +163,18 @@ async def create_or_update_group(
             parsed_inactive = json.loads(inactive_students_json)
             if isinstance(parsed_inactive, list):
                 data["inactive_students_json"] = [str(item).strip() for item in parsed_inactive if str(item).strip()]
+        except Exception:
+            pass
+
+    # avatars_json се изпраща само при ръчна смяна на аватар (момче/момиче) за ученик -
+    # мапинг име -> "boy"/"girl", не се пипа при обикновен запис на класа
+    if avatars_json is not None:
+        try:
+            parsed_avatars = json.loads(avatars_json)
+            if isinstance(parsed_avatars, dict):
+                data["student_avatars_json"] = {
+                    str(k): str(v) for k, v in parsed_avatars.items() if str(v) in ("boy", "girl")
+                }
         except Exception:
             pass
 

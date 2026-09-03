@@ -259,6 +259,11 @@ body {
     text-align: center;
 }
 
+.attendance-avatar-outer {
+    position: relative;
+    flex-shrink: 0;
+}
+
 .attendance-avatar-wrap {
     width: 100px;
     height: 100px;
@@ -266,7 +271,6 @@ body {
     box-shadow: 0px 4px 10px rgba(0, 0, 0, 0.3);
     transition: transform 0.3s ease-in-out;
     overflow: hidden;
-    flex-shrink: 0;
 }
 
 .attendance-avatar-wrap img {
@@ -274,6 +278,31 @@ body {
     width: 100%;
     height: 100%;
     object-fit: cover;
+}
+
+/* Моливче за ръчна смяна на момче/момиче, полепнало за долния десен ръб на аватара */
+.avatar-edit-btn {
+    position: absolute;
+    bottom: -2px;
+    right: -2px;
+    width: 28px;
+    height: 28px;
+    border-radius: 50%;
+    background: var(--card-bg);
+    border: 1px solid var(--border-color);
+    color: var(--text-muted);
+    font-size: 12px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    cursor: pointer;
+    box-shadow: 0 2px 6px rgba(0, 0, 0, 0.2);
+    font-family: 'Segoe UI', system-ui, -apple-system, sans-serif;
+}
+
+.avatar-edit-btn:hover {
+    color: var(--primary-blue);
+    background: var(--surface-alt);
 }
 
 .attendance-avatar-wrap:hover {
@@ -438,6 +467,13 @@ body {
 
 .tip-card.compact {
     max-width: 300px;
+}
+
+/* Линковете за споделяне (упражнения/гласуване) са по-широки от обичайна "Съвет"
+   карта, за да не се пренася самият URL на тесни части от реда */
+#exercises-link-card,
+#emotions-link-card {
+    max-width: 100%;
 }
 
 .tip-card .tip-icon {

@@ -18,6 +18,28 @@
     --excel-color: #16a34a;
     --ppt-color: #ea580c;
     --hero-gradient: linear-gradient(120deg, #eff6ff 0%, #f5f3ff 55%, #fdf2f8 100%);
+
+    /* Обща форма на интерфейса - радиуси, сенки и фокус пръстен, ползвани навсякъде */
+    --radius-lg: 16px;
+    --radius-md: 12px;
+    --radius-sm: 10px;
+    --shadow-sm: 0 1px 2px rgba(16, 24, 40, 0.04), 0 1px 3px rgba(16, 24, 40, 0.06);
+    --shadow-md: 0 4px 14px rgba(16, 24, 40, 0.07), 0 2px 4px rgba(16, 24, 40, 0.04);
+    --shadow-lg: 0 12px 28px rgba(16, 24, 40, 0.10);
+    --focus-ring: 0 0 0 3px rgba(37, 99, 235, 0.16);
+    --accent-soft: #eff6ff;
+
+    /* Меки тонове за цветните карти в Таблото */
+    --tint-blue: #eff6ff;
+    --tint-green: #f0fdf4;
+    --tint-purple: #f5f3ff;
+    --tint-orange: #fff7ed;
+    --tint-amber: #fffbeb;
+    --tint-border-blue: #dbeafe;
+    --tint-border-green: #dcfce7;
+    --tint-border-purple: #ede9fe;
+    --tint-border-orange: #ffedd5;
+    --tint-border-amber: #fef3c7;
 }
 
 /* Тъмна тема - активира се чрез data-theme="dark" на <html>, превключвана от JS и пазена в localStorage */
@@ -38,13 +60,33 @@
     --badge-red-bg: #7f1d1d;
     --badge-red-text: #fca5a5;
     --hero-gradient: linear-gradient(120deg, #1e3a5f 0%, #2c2c54 55%, #3b2340 100%);
+    --shadow-sm: 0 1px 2px rgba(0, 0, 0, 0.24), 0 1px 3px rgba(0, 0, 0, 0.2);
+    --shadow-md: 0 4px 14px rgba(0, 0, 0, 0.3), 0 2px 4px rgba(0, 0, 0, 0.2);
+    --shadow-lg: 0 12px 28px rgba(0, 0, 0, 0.4);
+    --focus-ring: 0 0 0 3px rgba(59, 130, 246, 0.28);
+    --accent-soft: #1e3a5f;
+    --tint-blue: #1b2b45;
+    --tint-green: #162a22;
+    --tint-purple: #241f3d;
+    --tint-orange: #2b2118;
+    --tint-amber: #2a2517;
+    --tint-border-blue: #2c4569;
+    --tint-border-green: #234436;
+    --tint-border-purple: #362f57;
+    --tint-border-orange: #43331f;
+    --tint-border-amber: #423a1f;
 }
 
 * {
     box-sizing: border-box;
     margin: 0;
     padding: 0;
-    font-family: 'Segoe UI', system-ui, -apple-system, sans-serif;
+    font-family: 'Inter', 'Segoe UI', system-ui, -apple-system, sans-serif;
+}
+
+body {
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
 }
 
 /* Гарантира, че атрибутът hidden винаги скрива елемента, дори когато класът му
@@ -123,19 +165,29 @@ body {
     display: flex;
     align-items: center;
     gap: 12px;
-    padding: 10px 14px;
+    padding: 11px 14px;
     color: var(--text-muted);
     text-decoration: none;
-    border-radius: 8px;
+    border-radius: var(--radius-sm);
     font-size: 14px;
     font-weight: 500;
-    transition: 0.2s;
+    transition: background 0.18s ease, color 0.18s ease;
 }
 
-.sidebar-menu li.active a,
+.sidebar-menu li a i:first-child {
+    width: 18px;
+    text-align: center;
+}
+
 .sidebar-menu li a:hover {
-    background: #eff6ff;
+    background: var(--surface-alt);
+    color: var(--text-dark);
+}
+
+.sidebar-menu li.active a {
+    background: var(--accent-soft);
     color: var(--primary-blue);
+    font-weight: 600;
 }
 
 /* Разгъващо меню "Класове" в страничната лента */
@@ -171,7 +223,7 @@ body {
 
 .sidebar-submenu li.active a,
 .sidebar-submenu li a:hover {
-    background: #eff6ff;
+    background: var(--accent-soft);
     color: var(--primary-blue);
 }
 
@@ -278,7 +330,8 @@ body {
     gap: 14px;
     background: var(--card-bg);
     border: 1px solid var(--border-color);
-    border-radius: 12px;
+    box-shadow: var(--shadow-sm);
+    border-radius: var(--radius-lg);
     padding: 12px 16px;
     margin-bottom: 20px;
 }
@@ -352,7 +405,7 @@ body {
 }
 
 .workspace-class-menu button.active {
-    background: #eff6ff;
+    background: var(--accent-soft);
     color: var(--primary-blue);
 }
 
@@ -629,7 +682,7 @@ body {
 
 /* "Съвет" карти */
 .tip-card {
-    background: #eff6ff;
+    background: var(--accent-soft);
     border: 1px solid #dbeafe;
     border-radius: 12px;
     padding: 14px 18px;
@@ -670,7 +723,7 @@ body {
 }
 
 .tip-banner {
-    background: #eff6ff;
+    background: var(--accent-soft);
     border: 1px solid #dbeafe;
     border-radius: 12px;
     padding: 18px 24px;
@@ -930,7 +983,7 @@ body {
     width: 56px;
     height: 56px;
     border-radius: 50%;
-    background: #eff6ff;
+    background: var(--accent-soft);
     color: var(--primary-blue);
     font-size: 22px;
     display: flex;
@@ -1014,13 +1067,24 @@ body {
 
 .custom-select, .custom-input, .custom-textarea {
     width: 100%;
-    padding: 9px 12px;
+    padding: 10px 12px;
     border: 1px solid var(--border-color);
-    border-radius: 8px;
+    border-radius: var(--radius-sm);
     background: var(--card-bg);
+    color: var(--text-dark);
     font-size: 14px;
     outline: none;
     margin-top: 6px;
+    transition: border-color 0.18s ease, box-shadow 0.18s ease;
+}
+
+.custom-select:focus, .custom-input:focus, .custom-textarea:focus {
+    border-color: var(--primary-blue);
+    box-shadow: var(--focus-ring);
+}
+
+.custom-input::placeholder, .custom-textarea::placeholder {
+    color: var(--text-muted);
 }
 
 .stats-grid {
@@ -1033,13 +1097,20 @@ body {
 .stat-card {
     background: var(--card-bg);
     border: 1px solid var(--border-color);
-    border-radius: 12px;
+    border-radius: var(--radius-lg);
+    box-shadow: var(--shadow-sm);
+    transition: transform 0.18s ease, box-shadow 0.18s ease;
     padding: 20px;
     display: flex;
     align-items: center;
     justify-content: space-between;
     gap: 16px;
     min-width: 0;
+}
+
+.stat-card:hover {
+    transform: translateY(-2px);
+    box-shadow: var(--shadow-md);
 }
 
 .stat-left {
@@ -1163,11 +1234,12 @@ body {
     justify-content: space-between;
     flex-wrap: wrap;
     gap: 20px;
-    padding: 26px 28px;
+    padding: 28px 30px;
     margin-bottom: 20px;
-    border-radius: 16px;
+    border-radius: var(--radius-lg);
     border: 1px solid var(--border-color);
     background: var(--hero-gradient);
+    box-shadow: var(--shadow-sm);
 }
 
 .home-hero-text {
@@ -1275,18 +1347,20 @@ body {
     display: flex;
     align-items: center;
     gap: 10px;
-    padding: 12px;
+    padding: 13px;
     border: 1px solid var(--border-color);
-    border-radius: 12px;
+    border-radius: var(--radius-md);
     background: var(--card-bg);
     cursor: pointer;
     text-align: left;
     min-width: 0;
+    transition: border-color 0.18s ease, box-shadow 0.18s ease, transform 0.18s ease;
 }
 
 .home-class-card:hover {
     border-color: var(--primary-blue);
-    background: var(--surface-alt);
+    box-shadow: var(--shadow-md);
+    transform: translateY(-2px);
 }
 
 .home-class-card-info {
@@ -1323,16 +1397,16 @@ body {
 .calendar-grid {
     display: grid;
     grid-template-columns: repeat(7, 1fr);
-    gap: 4px;
+    gap: 2px;
 }
 
 .calendar-weekdays {
-    margin-bottom: 6px;
+    margin-bottom: 4px;
 }
 
 .calendar-weekdays span {
     text-align: center;
-    font-size: 11px;
+    font-size: 10px;
     font-weight: 700;
     color: var(--text-muted);
     text-transform: uppercase;
@@ -1340,7 +1414,7 @@ body {
 
 .calendar-day {
     position: relative;
-    aspect-ratio: 1;
+    height: 34px;
     display: flex;
     align-items: center;
     justify-content: center;
@@ -1348,7 +1422,7 @@ body {
     border-radius: 8px;
     background: transparent;
     color: var(--text-dark);
-    font-size: 13px;
+    font-size: 12.5px;
     cursor: pointer;
     padding: 0;
 }
@@ -1376,17 +1450,17 @@ body {
 
 .calendar-day-dots {
     position: absolute;
-    bottom: 4px;
+    bottom: 3px;
     left: 0;
     right: 0;
     display: flex;
     justify-content: center;
-    gap: 3px;
+    gap: 2px;
 }
 
 .calendar-day-dot {
-    width: 5px;
-    height: 5px;
+    width: 4px;
+    height: 4px;
     border-radius: 50%;
 }
 
@@ -1490,6 +1564,17 @@ body {
     font-size: 20px;
 }
 
+/* Цветни карти в Таблото - всяка тема има свой мек тон, за да са четими и на тъмно */
+.stat-card.tinted.tint-blue { background: var(--tint-blue); border-color: var(--tint-border-blue); }
+.stat-card.tinted.tint-green { background: var(--tint-green); border-color: var(--tint-border-green); }
+.stat-card.tinted.tint-purple { background: var(--tint-purple); border-color: var(--tint-border-purple); }
+.stat-card.tinted.tint-orange { background: var(--tint-orange); border-color: var(--tint-border-orange); }
+.stat-card.tinted.tint-amber { background: var(--tint-amber); border-color: var(--tint-border-amber); }
+
+.stat-card.tinted .stat-icon {
+    background: var(--card-bg);
+}
+
 .stat-title {
     font-size: 13px;
     color: var(--text-muted);
@@ -1509,9 +1594,10 @@ body {
 .chart-card, .table-card, .form-card {
     background: var(--card-bg);
     border: 1px solid var(--border-color);
-    border-radius: 12px;
-    padding: 20px;
+    border-radius: var(--radius-lg);
+    padding: 22px;
     margin-bottom: 20px;
+    box-shadow: var(--shadow-sm);
 }
 
 .styled-table {
@@ -1522,12 +1608,18 @@ body {
 
 .styled-table th {
     text-align: left;
-    padding: 12px;
-    font-size: 12px;
+    padding: 11px 12px;
+    font-size: 11px;
+    font-weight: 700;
+    letter-spacing: 0.04em;
+    text-transform: uppercase;
     color: var(--text-muted);
     border-bottom: 1px solid var(--border-color);
     background: var(--surface-alt);
 }
+
+.styled-table th:first-child { border-radius: var(--radius-sm) 0 0 var(--radius-sm); }
+.styled-table th:last-child { border-radius: 0 var(--radius-sm) var(--radius-sm) 0; }
 
 .styled-table td {
     padding: 14px 12px;
@@ -1535,8 +1627,13 @@ body {
     border-bottom: 1px solid var(--border-color);
 }
 
+.styled-table tbody tr:last-child td {
+    border-bottom: none;
+}
+
 .styled-table tr.clickable-row {
     cursor: pointer;
+    transition: background 0.15s ease;
 }
 
 .styled-table tr.clickable-row:hover {
@@ -1547,14 +1644,26 @@ body {
     background: var(--primary-blue);
     color: #fff;
     border: none;
-    padding: 10px 20px;
-    border-radius: 8px;
+    padding: 10px 18px;
+    border-radius: var(--radius-sm);
     cursor: pointer;
     font-weight: 600;
+    font-size: 13.5px;
     display: inline-flex;
     align-items: center;
     align-self: flex-start;
     gap: 8px;
+    box-shadow: var(--shadow-sm);
+    transition: background 0.18s ease, box-shadow 0.18s ease, transform 0.18s ease;
+}
+
+.btn-primary:hover:not(:disabled) {
+    background: var(--primary-hover);
+    box-shadow: var(--shadow-md);
+}
+
+.btn-primary:active:not(:disabled) {
+    transform: translateY(1px);
 }
 
 .btn-primary:disabled {
@@ -1572,14 +1681,31 @@ body {
     background: var(--card-bg);
     color: var(--text-dark);
     border: 1px solid var(--border-color);
-    padding: 10px 20px;
-    border-radius: 8px;
+    padding: 10px 18px;
+    border-radius: var(--radius-sm);
     cursor: pointer;
     font-weight: 600;
+    font-size: 13.5px;
     align-self: flex-start;
     display: inline-flex;
     align-items: center;
     gap: 8px;
+    transition: border-color 0.18s ease, background 0.18s ease, box-shadow 0.18s ease;
+}
+
+.btn-secondary:hover {
+    border-color: var(--primary-blue);
+    color: var(--primary-blue);
+    box-shadow: var(--shadow-sm);
+}
+
+.btn-primary:focus-visible,
+.btn-secondary:focus-visible,
+.btn-icon:focus-visible,
+.workspace-tab:focus-visible,
+.sidebar-menu li a:focus-visible {
+    outline: none;
+    box-shadow: var(--focus-ring);
 }
 
 /* Хоризонтален вариант на drop-zone (икона + текст вляво, бутон вдясно) */
@@ -2093,7 +2219,7 @@ body.student-body {
 .field-icon-box {
     width: 42px;
     height: 42px;
-    background: #eff6ff;
+    background: var(--accent-soft);
     border-radius: 10px;
     display: flex;
     align-items: center;
@@ -2126,7 +2252,7 @@ body.student-body {
 }
 
 .drop-zone.dragover {
-    background: #eff6ff;
+    background: var(--accent-soft);
     border-color: var(--primary-blue);
 }
 
@@ -2252,11 +2378,12 @@ body.student-body {
     display: flex;
     align-items: center;
     gap: 10px;
-    padding: 12px 16px;
-    border-radius: 10px;
+    padding: 13px 16px;
+    border-radius: var(--radius-md);
     background: var(--card-bg);
     color: var(--text-dark);
-    box-shadow: 0 8px 24px rgba(0, 0, 0, 0.16);
+    border: 1px solid var(--border-color);
+    box-shadow: var(--shadow-lg);
     font-size: 13px;
     font-weight: 600;
     min-width: 240px;

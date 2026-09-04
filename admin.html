@@ -4,6 +4,9 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>VPClassroom</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap">
     <link rel="stylesheet" href="style.css">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
 </head>
@@ -34,7 +37,7 @@
             </button>
 
             <ul class="sidebar-menu">
-                <li id="menu-home" class="active"><a href="#" onclick="showSection('home')"><i class="fa-solid fa-house"></i> Табло</a></li>
+                <li id="menu-home" class="active"><a href="#" onclick="goToOverview()"><i class="fa-solid fa-house"></i> Табло</a></li>
                 <li id="menu-classes-accordion" class="sidebar-accordion">
                     <a href="#" onclick="toggleClassesAccordion(); return false;">
                         <i class="fa-solid fa-layer-group"></i> Класове
@@ -107,7 +110,7 @@
                 </div>
 
                 <div class="stats-grid stats-grid-5">
-                    <div class="stat-card compact">
+                    <div class="stat-card compact tinted tint-blue">
                         <div class="stat-icon blue"><i class="fa-solid fa-users"></i></div>
                         <div class="stat-data">
                             <span class="stat-title">Активни ученици</span>
@@ -118,7 +121,7 @@
                         </div>
                     </div>
 
-                    <div class="stat-card compact">
+                    <div class="stat-card compact tinted tint-purple">
                         <div class="stat-icon purple"><i class="fa-solid fa-layer-group"></i></div>
                         <div class="stat-data">
                             <span class="stat-title">Класове</span>
@@ -128,7 +131,7 @@
                         </div>
                     </div>
 
-                    <div class="stat-card compact">
+                    <div class="stat-card compact tinted tint-green">
                         <div class="stat-icon green"><i class="fa-regular fa-clipboard"></i></div>
                         <div class="stat-data">
                             <span class="stat-title">Активни задачи</span>
@@ -139,7 +142,7 @@
                         </div>
                     </div>
 
-                    <div class="stat-card compact">
+                    <div class="stat-card compact tinted tint-orange">
                         <div class="stat-icon orange"><i class="fa-regular fa-clock"></i></div>
                         <div class="stat-data">
                             <span class="stat-title">Със срок днес</span>
@@ -149,7 +152,7 @@
                         </div>
                     </div>
 
-                    <div class="stat-card compact">
+                    <div class="stat-card compact tinted tint-amber">
                         <div class="stat-icon amber"><i class="fa-solid fa-inbox"></i></div>
                         <div class="stat-data">
                             <span class="stat-title">Предадени работи</span>

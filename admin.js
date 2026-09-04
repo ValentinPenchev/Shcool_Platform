@@ -385,6 +385,13 @@ function showSection(sectionId) {
     }
 
     if (sectionId === 'home') {
+        // Горната лента е контекст на конкретен клас - на Таблото никога не се показва,
+        // независимо през кой път сме стигнали дотук
+        if (lockedClassId) {
+            lockedClassId = null;
+            applyWorkspaceLock();
+            renderClassChips();
+        }
         loadHomeData();
     }
 }

@@ -684,6 +684,9 @@ document.getElementById("calendar-event-form")?.addEventListener("submit", async
 
     try {
         const res = await adminFetch(`${API_URL}/admin/calendar-events`, { method: "POST", body: formData });
+        if (res.status === 404 || res.status === 405) {
+            throw new Error("Сървърът още не е обновен със събитията в календара. Изчакайте внедряването в Render.");
+        }
         if (!res.ok) {
             const errData = await res.json().catch(() => ({}));
             throw new Error(errData.detail || `HTTP грешка: ${res.status}`);
@@ -2221,6 +2224,9 @@ async function exportSubmissionsExcel() {
 
     try {
         const res = await adminFetch(`${API_URL}/admin/submissions/export${params.length ? `?${params.join("&")}` : ""}`);
+        if (res.status === 404 || res.status === 405) {
+            throw new Error("Сървърът още не е обновен с новия експорт. Изчакайте да приключи внедряването в Render и опитайте пак.");
+        }
         if (!res.ok) throw new Error(`HTTP грешка: ${res.status}`);
 
         const blob = await res.blob();

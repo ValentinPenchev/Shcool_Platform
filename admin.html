@@ -219,7 +219,7 @@
                         <h1>Статистика за предадените задачи</h1>
                         <p class="subtitle" style="margin-bottom:0;">Проследете напредъка на учениците и резултатите от автоматичната проверка.</p>
                     </div>
-                    <button type="button" class="btn-secondary" onclick="exportSubmissionsCSV()"><i class="fa-solid fa-download"></i> Експорт на данни</button>
+                    <button type="button" class="btn-secondary" onclick="exportSubmissionsExcel()"><i class="fa-solid fa-file-excel"></i> Експорт в Excel</button>
                 </div>
 
                 <div class="filter-group" id="dashboard-class-filter-group">
@@ -289,19 +289,6 @@
                             </div>
                         </div>
                     </div>
-                </div>
-
-                <div class="table-card" id="criteria-breakdown-card" style="display:none;">
-                    <div class="table-card-header">
-                        <div class="card-title-row">
-                            <div class="icon-chip orange"><i class="fa-solid fa-chart-simple"></i></div>
-                            <div>
-                                <h3>Най-често пропускани критерии</h3>
-                                <div class="card-subtitle">По текущия филтър клас/задача - показва какво да се преговори</div>
-                            </div>
-                        </div>
-                    </div>
-                    <div id="criteria-breakdown-list" class="criteria-breakdown-list"></div>
                 </div>
 
                 <div class="table-card">
@@ -740,6 +727,33 @@
                 </div>
             </section>
         </main>
+    </div>
+
+    <!-- Преглед на предаден файл преди сваляне (Office Online viewer в iframe) -->
+    <div class="file-preview-overlay" id="file-preview-overlay" hidden onclick="closeFilePreviewOnBackdrop(event)">
+        <div class="file-preview-modal" role="dialog" aria-modal="true" aria-labelledby="file-preview-name">
+            <div class="file-preview-header">
+                <div class="file-preview-title">
+                    <i class="fa-regular fa-file-lines"></i>
+                    <div>
+                        <strong id="file-preview-name">Файл</strong>
+                        <span id="file-preview-meta"></span>
+                    </div>
+                </div>
+                <div class="file-preview-actions">
+                    <a id="file-preview-download" class="btn-primary" href="#" download><i class="fa-solid fa-download"></i> Свали</a>
+                    <a id="file-preview-newtab" class="btn-secondary" href="#" target="_blank" rel="noopener"><i class="fa-solid fa-arrow-up-right-from-square"></i> Нов таб</a>
+                    <button type="button" class="btn-icon" onclick="closeFilePreview()" title="Затвори"><i class="fa-solid fa-xmark"></i></button>
+                </div>
+            </div>
+            <div class="file-preview-body">
+                <div class="file-preview-loading" id="file-preview-loading">
+                    <i class="fa-solid fa-spinner fa-spin"></i> Прегледът се зарежда...
+                </div>
+                <iframe id="file-preview-frame" title="Преглед на файла" onload="onFilePreviewLoaded()"></iframe>
+            </div>
+            <p class="file-preview-hint">Прегледът се зарежда през Microsoft Office Online. Ако документът не се появи, използвайте "Свали" или "Нов таб".</p>
+        </div>
     </div>
 
     <script src="admin.js"></script>

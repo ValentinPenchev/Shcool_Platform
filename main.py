@@ -502,6 +502,163 @@ async def get_submissions(group_id: Optional[str] = None, assignment_id: Optiona
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Грешка при четене: {str(e)}")
 
+@app.get("/api/admin/submissions/export")
+async def export_submissions(
+    group_id: Optional[str] = None,
+    assignment_id: Optional[str] = None,
+    search: Optional[str] = None
+):
+    """Изнася предадените решения като форматиран Excel файл (лист с резултати + обобщение)."""
+    from openpyxl import Workbook
+    from openpyxl.styles import Font, PatternFill, Alignment, Border, Side
+    from openpyxl.utils import get_column_letter
+    from fastapi.responses import StreamingResponse
+
+    rows = await get_submissions(group_id=group_id, assignment_id=assignment_id)
+
+    if search:
+        needle = search.strip().lower()
+        rows = [r for r in rows if needle in (r.get("student_name") or "").lower()]
+
+    # Заглавия на задачите и имена на класовете, за да не се показват голи идентификатори
+    try:
+        assignments_res = supabase.table("assignments").select("id, title").execute()
+        title_by_assignment = {a["id"]: a.get("title") for a in (assignments_res.data or [])}
+    except Exception:
+        title_by_assignment = {}
+    try:
+        groups_res = supabase.table("groups").select("group_id, group_name").execute()
+        name_by_group = {g["group_id"]: g.get("group_name") for g in (groups_res.data or [])}
+    except Exception:
+        name_by_group = {}
+
+    rows.sort(key=lambda r: (r.get("class_id") or "", r.get("student_name") or ""))
+
+    wb = Workbook()
+    ws = wb.active
+    ws.title = "Резултати"
+
+    header_fill = PatternFill("solid", fgColor="2563EB")
+    header_font = Font(bold=True, color="FFFFFF", size=11)
+    title_font = Font(bold=True, size=14, color="1E293B")
+    muted_font = Font(size=10, color="64748B")
+    thin = Side(style="thin", color="E2E8F0")
+    border = Border(left=thin, right=thin, top=thin, bottom=thin)
+
+    headers = ["№", "Ученик", "Клас", "Задача", "Файл", "Предадено на",
+               "Точки", "Максимум", "Успех (%)", "Оценка", "Статус"]
+
+    ws.merge_cells(start_row=1, start_column=1, end_row=1, end_column=len(headers))
+    ws.cell(row=1, column=1, value="Резултати от предадените задачи").font = title_font
+
+    scope_bits = []
+    if group_id:
+        scope_bits.append(f"Клас: {name_by_group.get(group_id, group_id)}")
+    if assignment_id:
+        scope_bits.append(f"Задача: {title_by_assignment.get(assignment_id, assignment_id)}")
+    scope_bits.append(f"Генериран на {datetime.now().strftime('%d.%m.%Y %H:%M')}")
+    ws.merge_cells(start_row=2, start_column=1, end_row=2, end_column=len(headers))
+    ws.cell(row=2, column=1, value=" · ".join(scope_bits)).font = muted_font
+
+    header_row = 4
+    for col, name in enumerate(headers, start=1):
+        cell = ws.cell(row=header_row, column=col, value=name)
+        cell.fill = header_fill
+        cell.font = header_font
+        cell.border = border
+        cell.alignment = Alignment(horizontal="center", vertical="center", wrap_text=True)
+    ws.row_dimensions[header_row].height = 26
+
+    grade_fills = {
+        6: PatternFill("solid", fgColor="DCFCE7"),
+        5: PatternFill("solid", fgColor="E0F2FE"),
+        4: PatternFill("solid", fgColor="FEF3C7"),
+        3: PatternFill("solid", fgColor="FFEDD5"),
+        2: PatternFill("solid", fgColor="FEE2E2"),
+    }
+
+    for i, sub in enumerate(rows, start=1):
+        r = header_row + i
+        submitted = _parse_iso(sub.get("created_at"))
+        values = [
+            i,
+            sub.get("student_name") or "",
+            name_by_group.get(sub.get("class_id"), sub.get("class_id") or ""),
+            title_by_assignment.get(sub.get("assignment_id"), sub.get("assignment_id") or "—"),
+            sub.get("filename") or "",
+            submitted.strftime("%d.%m.%Y %H:%M") if submitted else "",
+            sub.get("score") or 0,
+            sub.get("max_score") or 0,
+            round(sub.get("percentage") or 0, 1),
+            f'{sub.get("grade", "")} ({sub.get("grade_label", "")})'.strip(),
+            "Закъснял" if sub.get("is_late") else "В срок",
+        ]
+        for col, value in enumerate(values, start=1):
+            cell = ws.cell(row=r, column=col, value=value)
+            cell.border = border
+            if col in (1, 7, 8, 9):
+                cell.alignment = Alignment(horizontal="center")
+            elif col in (10, 11):
+                cell.alignment = Alignment(horizontal="center")
+        grade_fill = grade_fills.get(sub.get("grade"))
+        if grade_fill:
+            ws.cell(row=r, column=10).fill = grade_fill
+        if sub.get("is_late"):
+            ws.cell(row=r, column=11).font = Font(color="B91C1C", bold=True)
+
+    widths = [5, 26, 14, 26, 30, 18, 9, 11, 11, 18, 12]
+    for col, width in enumerate(widths, start=1):
+        ws.column_dimensions[get_column_letter(col)].width = width
+
+    ws.freeze_panes = ws.cell(row=header_row + 1, column=1)
+    if rows:
+        ws.auto_filter.ref = f"A{header_row}:{get_column_letter(len(headers))}{header_row + len(rows)}"
+
+    # Втори лист с обобщение - общо число, среден успех и разпределение на оценките
+    ws2 = wb.create_sheet("Обобщение")
+    ws2.column_dimensions["A"].width = 32
+    ws2.column_dimensions["B"].width = 16
+    ws2.cell(row=1, column=1, value="Обобщение").font = title_font
+
+    total = len(rows)
+    avg = round(sum((s.get("percentage") or 0) for s in rows) / total, 1) if total else 0
+    late = sum(1 for s in rows if s.get("is_late"))
+    summary = [
+        ("Общо предадени работи", total),
+        ("Среден успех (%)", avg),
+        ("Закъснели предавания", late),
+        ("Различни ученици", len({s.get("student_name") for s in rows if s.get("student_name")})),
+    ]
+    for i, (label, value) in enumerate(summary, start=3):
+        ws2.cell(row=i, column=1, value=label).font = Font(bold=True)
+        ws2.cell(row=i, column=2, value=value)
+
+    ws2.cell(row=8, column=1, value="Разпределение на оценките").font = Font(bold=True, size=12)
+    dist_header = 9
+    for col, name in enumerate(["Оценка", "Брой"], start=1):
+        cell = ws2.cell(row=dist_header, column=col, value=name)
+        cell.fill = header_fill
+        cell.font = header_font
+        cell.alignment = Alignment(horizontal="center")
+    for i, grade in enumerate([6, 5, 4, 3, 2], start=1):
+        count = sum(1 for s in rows if s.get("grade") == grade)
+        ws2.cell(row=dist_header + i, column=1, value=grade).alignment = Alignment(horizontal="center")
+        ws2.cell(row=dist_header + i, column=2, value=count).alignment = Alignment(horizontal="center")
+        fill = grade_fills.get(grade)
+        if fill:
+            ws2.cell(row=dist_header + i, column=1).fill = fill
+
+    buffer = io.BytesIO()
+    wb.save(buffer)
+    buffer.seek(0)
+
+    filename = f"rezultati_{datetime.now().strftime('%Y-%m-%d')}.xlsx"
+    return StreamingResponse(
+        buffer,
+        media_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+        headers={"Content-Disposition": f'attachment; filename="{filename}"'}
+    )
+
 @app.delete("/api/admin/submissions/{submission_id}")
 async def delete_submission(submission_id: int):
     try:

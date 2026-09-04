@@ -1908,50 +1908,9 @@ async function loadDashboardData() {
         if (searchInput) searchInput.value = "";
         submissionsCurrentPage = 1;
         renderSubmissionsTable();
-        renderCriteriaBreakdown();
     } catch (err) {
         console.error("Грешка при зареждане на таблото:", err);
     }
-}
-
-// Агрегира кои критерии най-често не са изпълнени сред текущо филтрираните предавания -
-// помага бързо да се види какво трябва да се преговори с класа
-function renderCriteriaBreakdown() {
-    const card = document.getElementById("criteria-breakdown-card");
-    const container = document.getElementById("criteria-breakdown-list");
-    if (!card || !container) return;
-
-    const failureCounts = {};
-    let submissionsWithDetails = 0;
-
-    submissionsCache.forEach(sub => {
-        const details = sub.details_json && Array.isArray(sub.details_json.details) ? sub.details_json.details : null;
-        if (!details) return;
-        submissionsWithDetails++;
-        details.forEach(d => {
-            if (d.passed) return;
-            const label = d.criterion || "Критерий";
-            failureCounts[label] = (failureCounts[label] || 0) + 1;
-        });
-    });
-
-    if (submissionsWithDetails === 0 || Object.keys(failureCounts).length === 0) {
-        card.style.display = "none";
-        return;
-    }
-
-    const entries = Object.entries(failureCounts).sort((a, b) => b[1] - a[1]).slice(0, 8);
-    const maxCount = entries[0][1];
-
-    container.innerHTML = entries.map(([label, count]) => `
-        <div class="criteria-bar-row">
-            <span class="criteria-bar-label">${label}</span>
-            <div class="progress-bar-track criteria-bar-track"><div class="progress-bar-fill" style="width:${Math.round((count / maxCount) * 100)}%"></div></div>
-            <span class="criteria-bar-count">${count} / ${submissionsWithDetails}</span>
-        </div>
-    `).join("");
-
-    card.style.display = "block";
 }
 
 // Обновява кръглия прогрес пръстен за средния успех
@@ -2014,7 +1973,7 @@ function renderSubmissionsTable() {
         const submittedAt = formatSubmittedAt(sub.created_at);
         const fileActions = (sub.file_url && sub.file_url !== '#')
             ? `
-                <a href="${sub.file_url}" target="_blank" rel="noopener" class="btn-icon" title="Отвори в нов прозорец"><i class="fa-regular fa-eye"></i></a>
+                <button type="button" class="btn-icon" title="Прегледай материала" onclick="openFilePreview('${sub.file_url}', ${JSON.stringify(sub.filename || 'Файл').replace(/"/g, '&quot;')}, ${JSON.stringify(`${studentName} · ${submittedAt}`).replace(/"/g, '&quot;')})"><i class="fa-regular fa-eye"></i></button>
                 <a href="${sub.file_url}" download="${sub.filename || ''}" class="btn-icon" title="Свали материала"><i class="fa-solid fa-download"></i></a>
               `
             : '<span class="stat-sub">Няма файл</span>';
@@ -2077,6 +2036,67 @@ function toggleSubmissionDetails(submissionId) {
     row.hidden = !row.hidden;
     if (toggleBtn) toggleBtn.classList.toggle('expanded', !row.hidden);
 }
+
+// -----------------------------------------------------------------------------
+// ПРЕГЛЕД НА ФАЙЛ ПРЕДИ СВАЛЯНЕ - .docx/.xlsx/.pptx не се отварят директно в браузъра,
+// затова минаваме през Office Online viewer-а, който чете публичния линк от Storage
+// -----------------------------------------------------------------------------
+const OFFICE_PREVIEW_EXTENSIONS = ["doc", "docx", "xls", "xlsx", "ppt", "pptx"];
+
+function fileExtension(name) {
+    return (name || "").split(".").pop().toLowerCase();
+}
+
+function buildPreviewUrl(fileUrl, filename) {
+    const ext = fileExtension(filename || fileUrl);
+    if (OFFICE_PREVIEW_EXTENSIONS.includes(ext)) {
+        return `https://view.officeapps.live.com/op/embed.aspx?src=${encodeURIComponent(fileUrl)}`;
+    }
+    // PDF, изображения и текстови файлове браузърът показва сам
+    return fileUrl;
+}
+
+function openFilePreview(fileUrl, filename, meta = "") {
+    if (!fileUrl || fileUrl === "#") {
+        showToast("Няма прикачен файл за преглед.", "warning");
+        return;
+    }
+
+    document.getElementById("file-preview-name").textContent = filename || "Файл";
+    document.getElementById("file-preview-meta").textContent = meta;
+
+    const downloadLink = document.getElementById("file-preview-download");
+    downloadLink.href = fileUrl;
+    downloadLink.setAttribute("download", filename || "");
+    document.getElementById("file-preview-newtab").href = fileUrl;
+
+    document.getElementById("file-preview-loading").style.display = "flex";
+    document.getElementById("file-preview-frame").src = buildPreviewUrl(fileUrl, filename);
+    document.getElementById("file-preview-overlay").hidden = false;
+    document.body.style.overflow = "hidden";
+}
+
+function onFilePreviewLoaded() {
+    const loading = document.getElementById("file-preview-loading");
+    if (loading) loading.style.display = "none";
+}
+
+function closeFilePreview() {
+    document.getElementById("file-preview-overlay").hidden = true;
+    // Източникът се изчиства, за да спре зареждането и да не остане стар документ
+    document.getElementById("file-preview-frame").src = "about:blank";
+    document.body.style.overflow = "";
+}
+
+function closeFilePreviewOnBackdrop(event) {
+    if (event.target.id === "file-preview-overlay") closeFilePreview();
+}
+
+document.addEventListener("keydown", (e) => {
+    if (e.key === "Escape" && !document.getElementById("file-preview-overlay")?.hidden) {
+        closeFilePreview();
+    }
+});
 
 // Форматира датата на предаване като дд/мм/гггг чч:мм
 function formatSubmittedAt(dateStr) {
@@ -2181,32 +2201,42 @@ function downloadCSV(filenamePrefix, headers, rows) {
     URL.revokeObjectURL(url);
 }
 
-function exportSubmissionsCSV() {
-    const rows = getFilteredSubmissions();
-    if (rows.length === 0) {
+// Експортът се генерира на сървъра с openpyxl - готов, форматиран Excel файл
+// (лист "Резултати" със стилизирана таблица и лист "Обобщение"), а не суров CSV
+async function exportSubmissionsExcel() {
+    if (getFilteredSubmissions().length === 0) {
         showToast("Няма данни за експортиране.", "warning");
         return;
     }
 
-    const headers = ["Ученик", "Задача", "Клас", "Файл", "Предадено на", "Точки", "Максимум точки", "Успех (%)", "Оценка"];
-    const csvRows = rows.map(sub => {
-        const taskTitle = assignmentTitleById[sub.assignment_id] || sub.assignment_id || "";
-        const gradeInfo = pointsToGrade(sub.percentage || 0);
-        return [
-            sub.student_name || "",
-            taskTitle,
-            sub.class_id || "",
-            sub.filename || "",
-            formatSubmittedAt(sub.created_at),
-            sub.score || 0,
-            sub.max_score || 0,
-            sub.percentage || 0,
-            `${sub.grade ?? gradeInfo.grade} (${sub.grade_label ?? gradeInfo.label})`
-        ];
-    });
+    const params = [];
+    const classId = document.getElementById("filter-group")?.value;
+    const assignmentId = document.getElementById("filter-assignment")?.value;
+    const search = document.getElementById("submissions-search")?.value.trim();
+    if (classId) params.push(`group_id=${encodeURIComponent(classId)}`);
+    if (assignmentId) params.push(`assignment_id=${encodeURIComponent(assignmentId)}`);
+    if (search) params.push(`search=${encodeURIComponent(search)}`);
 
-    downloadCSV("rezultati", headers, csvRows);
-    showToast("Резултатите бяха свалени успешно.", "success");
+    showToast("Excel файлът се подготвя...", "info");
+
+    try {
+        const res = await adminFetch(`${API_URL}/admin/submissions/export${params.length ? `?${params.join("&")}` : ""}`);
+        if (!res.ok) throw new Error(`HTTP грешка: ${res.status}`);
+
+        const blob = await res.blob();
+        const url = URL.createObjectURL(blob);
+        const link = document.createElement("a");
+        link.href = url;
+        link.download = `rezultati_${new Date().toISOString().slice(0, 10)}.xlsx`;
+        document.body.appendChild(link);
+        link.click();
+        document.body.removeChild(link);
+        URL.revokeObjectURL(url);
+
+        showToast("Excel файлът беше свален успешно.", "success");
+    } catch (err) {
+        showToast("Грешка при експортиране: " + err.message, "error");
+    }
 }
 
 // -----------------------------------------------------------------------------
@@ -2384,7 +2414,7 @@ function renderExercisesTable(classId) {
                         ${batch.map(u => `
                             <li>
                                 <i class="fa-regular fa-file-lines"></i> ${u.filename || 'Файл'} · ${formatSubmittedAt(u.created_at)}
-                                ${u.file_url && u.file_url !== '#' ? `<a href="${u.file_url}" target="_blank" rel="noopener" class="btn-icon" title="Отвори"><i class="fa-regular fa-eye"></i></a>` : ''}
+                                ${u.file_url && u.file_url !== '#' ? `<button type="button" class="btn-icon" title="Прегледай" onclick="event.stopPropagation(); openFilePreview('${u.file_url}', ${JSON.stringify(u.filename || 'Файл').replace(/"/g, '&quot;')})"><i class="fa-regular fa-eye"></i></button>` : ''}
                                 <button type="button" class="btn-danger-icon" onclick="event.stopPropagation(); deleteExerciseUpload(${u.id}, '${classId}')" title="Изтрий качването"><i class="fa-regular fa-trash-can"></i></button>
                             </li>
                         `).join('')}

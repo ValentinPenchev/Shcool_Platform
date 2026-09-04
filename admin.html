@@ -28,10 +28,10 @@
 
         <!-- ЛЯВА НАВИГАЦИОННА ЛЕНТА -->
         <aside class="sidebar" id="sidebar">
-            <div class="sidebar-brand">
+            <button type="button" class="sidebar-brand" onclick="goToOverview()">
                 <img src="assets/logo.png" alt="VPClassroom" class="brand-logo">
                 <h2>VPClassroom</h2>
-            </div>
+            </button>
 
             <ul class="sidebar-menu">
                 <li id="menu-home"><a href="#" onclick="goToOverview()"><i class="fa-solid fa-house"></i> Табло</a></li>
@@ -171,30 +171,6 @@
                                 <strong id="stat-missing">0</strong>
                             </div>
                         </div>
-                    </div>
-                </div>
-
-                <div class="dashboard-charts-row">
-                    <div class="table-card">
-                        <div class="table-card-header">
-                            <h3 style="margin:0;">Разпределение на резултатите</h3>
-                        </div>
-                        <div class="donut-chart-wrap">
-                            <div class="donut-chart" id="grade-donut-chart">
-                                <div class="donut-chart-center">
-                                    <strong id="grade-donut-total">0</strong>
-                                    <span>предавания</span>
-                                </div>
-                            </div>
-                            <div class="donut-legend" id="grade-donut-legend"></div>
-                        </div>
-                    </div>
-
-                    <div class="table-card">
-                        <div class="table-card-header">
-                            <h3 style="margin:0;">Последно предадени задачи</h3>
-                        </div>
-                        <div class="recent-activity-list" id="recent-activity-list"></div>
                     </div>
                 </div>
 

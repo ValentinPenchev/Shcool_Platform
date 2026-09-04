@@ -90,10 +90,12 @@ async function initializeAdminApp() {
     // Изчакваме класовете и задачите, за да са налични имената им (напр. в колоната "Задача"),
     // преди първото зареждане на статистиката
     await Promise.all([loadClasses(), loadAssignments()]);
-    loadDashboardData();
-    startDashboardPolling();
+    // Статистиката се зарежда наум, за да е готова при влизане в клас, а на екрана
+    // се показва Таблото
+    await loadDashboardData();
     setupCriteriaDropZone();
     loadTemplates();
+    showSection('home');
 }
 
 function adminLogout() {
@@ -291,7 +293,7 @@ function exitClassWorkspace() {
     goToOverview();
 }
 
-// "Табло" в страничната лента - излиза от работния панел на класа и показва общата статистика
+// "Табло" (и логото) - излиза от работния панел на класа и показва началния екран
 function goToOverview() {
     lockedClassId = null;
     applyWorkspaceLock();
@@ -300,22 +302,19 @@ function goToOverview() {
     if (filterGroup) filterGroup.value = "";
     if (filterAssignments) filterAssignments.value = "";
     renderClassChips();
-    showSection('dashboard');
+    showSection('home');
 }
 
-// Присъствие/Емоциометър от страничната лента - изискват заключен клас,
-// затова ако все още няма избран клас се влиза автоматично в първия наличен
-function goToClassScopedSection(sectionId) {
-    if (!lockedClassId) {
-        const firstClassId = Object.keys(classesData)[0];
-        if (!firstClassId) {
-            showToast("Първо добавете клас, за да ползвате тази секция.", "error");
-            return;
-        }
-        lockedClassId = firstClassId;
-        applyWorkspaceLock();
-    }
-    showSection(sectionId);
+// Бързи действия от Таблото - секциите вече не са в страничната лента,
+// затова се отварят оттук (създаване на задача и управление на класове/ученици)
+function goToCreateAssignment() {
+    showSection('assignments');
+    document.getElementById("assign-title")?.focus();
+}
+
+function goToAddStudent() {
+    showSection('classes');
+    document.getElementById("class-id")?.focus();
 }
 
 function toggleAccountMenu() {
@@ -383,6 +382,323 @@ function showSection(sectionId) {
 
     if (sectionId === 'emotions') {
         loadEmotionsData();
+    }
+
+    if (sectionId === 'home') {
+        loadHomeData();
+    }
+}
+
+// -----------------------------------------------------------------------------
+// ТАБЛО (начален екран) - поздрав според часа, обобщени числа, плочки на класовете
+// и календар със сроковете на задачите + собствените събития на учителя
+// -----------------------------------------------------------------------------
+const TEACHER_NAME = "Валентин";
+
+// Задачите тук се държат отделно от assignmentsCache, защото той се филтрира по клас
+// при влизане в работния панел, а Таблото показва обобщение за всички класове
+let homeAssignments = [];
+let calendarEvents = [];
+let calendarViewDate = new Date();
+let calendarSelectedDate = toDateKey(new Date());
+
+// Ключ на дата (YYYY-MM-DD) по местно време - toISOString() би върнал UTC и би
+// изместил деня с часовата зона
+function toDateKey(date) {
+    const pad = (n) => String(n).padStart(2, "0");
+    return `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())}`;
+}
+
+async function loadHomeData() {
+    renderHomeGreeting();
+
+    try {
+        const [assignmentsRes, eventsRes] = await Promise.all([
+            adminFetch(`${API_URL}/admin/assignments`),
+            adminFetch(`${API_URL}/admin/calendar-events`)
+        ]);
+        homeAssignments = assignmentsRes.ok ? await assignmentsRes.json() : [];
+        calendarEvents = eventsRes.ok ? await eventsRes.json() : [];
+    } catch (err) {
+        console.error("Грешка при зареждане на таблото:", err);
+    }
+
+    renderHomeStats();
+    renderHomeClasses();
+    renderHomeDeadlines();
+    renderCalendar();
+
+    const dateInput = document.getElementById("calendar-event-date");
+    if (dateInput && !dateInput.value) dateInput.value = calendarSelectedDate;
+}
+
+function renderHomeGreeting() {
+    const now = new Date();
+    const hour = now.getHours();
+    let greeting = "Добър ден";
+    if (hour < 12) greeting = "Добро утро";
+    else if (hour >= 18) greeting = "Добър вечер";
+
+    document.getElementById("home-greeting").textContent = `${greeting}, ${TEACHER_NAME} 👋`;
+    const dateText = now.toLocaleDateString("bg-BG", { day: "numeric", month: "long", year: "numeric" });
+    document.getElementById("home-hero-sub").textContent = `Ето какво се случва в платформата днес, ${dateText}`;
+}
+
+function renderHomeStats() {
+    const classIds = Object.keys(classesData);
+    const totalStudents = Object.values(classesData).reduce((sum, c) => sum + (c.students || []).length, 0);
+
+    document.getElementById("home-stat-students").textContent = totalStudents;
+    document.getElementById("home-stat-students-sub").textContent = `в ${classIds.length} ${classIds.length === 1 ? "клас" : "класа"}`;
+    document.getElementById("home-stat-classes").textContent = classIds.length;
+
+    const todayKey = toDateKey(new Date());
+    const now = Date.now();
+    // "Активна" е задача без краен срок или такава, чийто срок още не е минал
+    const active = homeAssignments.filter(a => !a.deadline || new Date(a.deadline).getTime() >= now).length;
+    const dueToday = homeAssignments.filter(a => a.deadline && toDateKey(new Date(a.deadline)) === todayKey).length;
+
+    document.getElementById("home-stat-active").textContent = active;
+    document.getElementById("home-stat-active-sub").textContent = `от ${homeAssignments.length} общо`;
+    document.getElementById("home-stat-due-today").textContent = dueToday;
+    document.getElementById("home-stat-submissions").textContent = submissionsCache.length;
+}
+
+function renderHomeClasses() {
+    const grid = document.getElementById("home-class-grid");
+    if (!grid) return;
+
+    const entries = Object.entries(classesData);
+    if (entries.length === 0) {
+        grid.innerHTML = `<span class="stat-sub">Още няма класове. Създайте първия си клас с бутона горе.</span>`;
+        return;
+    }
+
+    grid.innerHTML = entries.map(([classId, data], i) => {
+        const name = data.className || classId;
+        const count = (data.students || []).length;
+        return `
+            <button type="button" class="home-class-card" onclick="enterClassWorkspace('${classId}')">
+                <span class="class-badge c${i % 5}">${name.slice(0, 2)}</span>
+                <span class="home-class-card-info">
+                    <strong>${name}</strong>
+                    <span>${count} ${count === 1 ? "ученик" : "ученици"}</span>
+                </span>
+            </button>
+        `;
+    }).join("");
+}
+
+// Следващите задачи с краен срок - допълва числото "Със срок днес" с конкретния списък
+function renderHomeDeadlines() {
+    const container = document.getElementById("home-deadlines");
+    if (!container) return;
+
+    const now = Date.now();
+    const upcoming = homeAssignments
+        .filter(a => a.deadline && new Date(a.deadline).getTime() >= now)
+        .sort((a, b) => new Date(a.deadline) - new Date(b.deadline))
+        .slice(0, 5);
+
+    if (upcoming.length === 0) {
+        container.innerHTML = `<span class="stat-sub">Няма задачи с предстоящ краен срок.</span>`;
+        return;
+    }
+
+    const todayKey = toDateKey(new Date());
+    container.innerHTML = upcoming.map(a => {
+        const deadline = new Date(a.deadline);
+        const dayKey = toDateKey(deadline);
+        const daysLeft = Math.round((new Date(`${dayKey}T00:00:00`) - new Date(`${todayKey}T00:00:00`)) / 86400000);
+        let whenText = deadline.toLocaleDateString("bg-BG", { day: "numeric", month: "long" });
+        if (daysLeft === 0) whenText = "днес";
+        else if (daysLeft === 1) whenText = "утре";
+        const tier = daysLeft <= 1 ? "grade-low" : (daysLeft <= 3 ? "grade-mid" : "grade-high");
+        const className = a.group_id && classesData[a.group_id] ? classesData[a.group_id].className : (a.group_id || "");
+        return `
+            <div class="home-deadline-row">
+                <span class="stat-icon blue" style="width:34px;height:34px;font-size:13px;"><i class="fa-regular fa-clipboard"></i></span>
+                <span class="home-deadline-info">
+                    <strong>${a.title || "Задача"}</strong>
+                    <span>${className}</span>
+                </span>
+                <span class="badge-status grade-badge ${tier}">${whenText}</span>
+            </div>
+        `;
+    }).join("");
+}
+
+// ---------------------------- Календар ---------------------------------------
+const CALENDAR_TYPE_COLORS = {
+    deadline: "#2563eb",
+    exam: "#dc2626",
+    meeting: "#7c3aed",
+    holiday: "#16a34a",
+    event: "#f59e0b"
+};
+const CALENDAR_TYPE_LABELS = {
+    deadline: "Краен срок",
+    exam: "Контролно",
+    meeting: "Среща",
+    holiday: "Ваканция",
+    event: "Събитие"
+};
+
+// Обединява сроковете на задачите (автоматични) с ръчно въведените събития
+function getAllCalendarEntries() {
+    const fromAssignments = homeAssignments
+        .filter(a => a.deadline)
+        .map(a => ({
+            id: `assignment-${a.id}`,
+            title: a.title || "Задача",
+            dateKey: toDateKey(new Date(a.deadline)),
+            type: "deadline",
+            classId: a.group_id || a.class_id || null,
+            isAssignment: true
+        }));
+
+    const fromEvents = calendarEvents.map(e => ({
+        id: e.id,
+        title: e.title || "Събитие",
+        dateKey: (e.event_date || "").slice(0, 10),
+        type: e.event_type || "event",
+        classId: e.class_id || null,
+        isAssignment: false
+    }));
+
+    return [...fromAssignments, ...fromEvents];
+}
+
+function renderCalendar() {
+    const grid = document.getElementById("calendar-grid");
+    const title = document.getElementById("calendar-title");
+    if (!grid) return;
+
+    const year = calendarViewDate.getFullYear();
+    const month = calendarViewDate.getMonth();
+    title.textContent = calendarViewDate.toLocaleDateString("bg-BG", { month: "long", year: "numeric" });
+
+    const firstOfMonth = new Date(year, month, 1);
+    // Понеделник е първи ден от седмицата (getDay() връща 0 за неделя)
+    const leadingDays = (firstOfMonth.getDay() + 6) % 7;
+    const gridStart = new Date(year, month, 1 - leadingDays);
+
+    const entries = getAllCalendarEntries();
+    const todayKey = toDateKey(new Date());
+
+    let html = "";
+    for (let i = 0; i < 42; i++) {
+        const day = new Date(gridStart.getFullYear(), gridStart.getMonth(), gridStart.getDate() + i);
+        const key = toDateKey(day);
+        const dayEntries = entries.filter(e => e.dateKey === key);
+        const classes = ["calendar-day"];
+        if (day.getMonth() !== month) classes.push("other-month");
+        if (key === todayKey) classes.push("today");
+        if (key === calendarSelectedDate) classes.push("selected");
+
+        const dots = [...new Set(dayEntries.map(e => e.type))].slice(0, 3)
+            .map(type => `<span class="calendar-day-dot" style="background:${CALENDAR_TYPE_COLORS[type] || CALENDAR_TYPE_COLORS.event}"></span>`)
+            .join("");
+
+        html += `
+            <button type="button" class="${classes.join(' ')}" onclick="selectCalendarDay('${key}')">
+                ${day.getDate()}
+                ${dots ? `<span class="calendar-day-dots">${dots}</span>` : ""}
+            </button>
+        `;
+    }
+    grid.innerHTML = html;
+
+    renderCalendarEvents();
+}
+
+function selectCalendarDay(dateKey) {
+    calendarSelectedDate = dateKey;
+    const dateInput = document.getElementById("calendar-event-date");
+    if (dateInput) dateInput.value = dateKey;
+    renderCalendar();
+}
+
+function shiftCalendarMonth(delta) {
+    calendarViewDate = new Date(calendarViewDate.getFullYear(), calendarViewDate.getMonth() + delta, 1);
+    renderCalendar();
+}
+
+function goToCalendarToday() {
+    calendarViewDate = new Date();
+    calendarSelectedDate = toDateKey(new Date());
+    renderCalendar();
+}
+
+function renderCalendarEvents() {
+    const container = document.getElementById("calendar-events");
+    if (!container) return;
+
+    const dayEntries = getAllCalendarEntries().filter(e => e.dateKey === calendarSelectedDate);
+    const dateLabel = new Date(`${calendarSelectedDate}T00:00:00`)
+        .toLocaleDateString("bg-BG", { day: "numeric", month: "long" });
+
+    if (dayEntries.length === 0) {
+        container.innerHTML = `<span class="stat-sub">Няма събития на ${dateLabel}.</span>`;
+        return;
+    }
+
+    container.innerHTML = dayEntries.map(entry => {
+        const color = CALENDAR_TYPE_COLORS[entry.type] || CALENDAR_TYPE_COLORS.event;
+        const className = entry.classId && classesData[entry.classId]
+            ? ` · ${classesData[entry.classId].className}`
+            : "";
+        const deleteBtn = entry.isAssignment
+            ? ""
+            : `<button type="button" class="btn-danger-icon" onclick="deleteCalendarEvent(${entry.id})" title="Изтрий събитието"><i class="fa-regular fa-trash-can"></i></button>`;
+        return `
+            <div class="calendar-event-row">
+                <span class="calendar-event-bar" style="background:${color}"></span>
+                <span class="calendar-event-info">
+                    <strong>${entry.title}</strong>
+                    <span>${CALENDAR_TYPE_LABELS[entry.type] || "Събитие"}${className}</span>
+                </span>
+                ${deleteBtn}
+            </div>
+        `;
+    }).join("");
+}
+
+document.getElementById("calendar-event-form")?.addEventListener("submit", async (e) => {
+    e.preventDefault();
+    const titleInput = document.getElementById("calendar-event-title");
+    const dateInput = document.getElementById("calendar-event-date");
+    const typeInput = document.getElementById("calendar-event-type");
+
+    const formData = new FormData();
+    formData.append("title", titleInput.value.trim());
+    formData.append("event_date", dateInput.value);
+    formData.append("event_type", typeInput.value);
+
+    try {
+        const res = await adminFetch(`${API_URL}/admin/calendar-events`, { method: "POST", body: formData });
+        if (!res.ok) {
+            const errData = await res.json().catch(() => ({}));
+            throw new Error(errData.detail || `HTTP грешка: ${res.status}`);
+        }
+        titleInput.value = "";
+        calendarSelectedDate = dateInput.value;
+        calendarViewDate = new Date(`${dateInput.value}T00:00:00`);
+        await loadHomeData();
+        showToast("Събитието е добавено.", "success");
+    } catch (err) {
+        showToast("Грешка при запис на събитието: " + err.message, "error");
+    }
+});
+
+async function deleteCalendarEvent(eventId) {
+    if (!confirm("Да изтрия ли това събитие?")) return;
+    try {
+        const res = await adminFetch(`${API_URL}/admin/calendar-events/${eventId}`, { method: "DELETE" });
+        if (!res.ok) throw new Error(`HTTP грешка: ${res.status}`);
+        await loadHomeData();
+    } catch (err) {
+        showToast("Грешка при изтриване на събитието: " + err.message, "error");
     }
 }
 

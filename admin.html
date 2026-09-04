@@ -34,7 +34,7 @@
             </button>
 
             <ul class="sidebar-menu">
-                <li id="menu-home"><a href="#" onclick="goToOverview()"><i class="fa-solid fa-house"></i> Табло</a></li>
+                <li id="menu-home" class="active"><a href="#" onclick="showSection('home')"><i class="fa-solid fa-house"></i> Табло</a></li>
                 <li id="menu-classes-accordion" class="sidebar-accordion">
                     <a href="#" onclick="toggleClassesAccordion(); return false;">
                         <i class="fa-solid fa-layer-group"></i> Класове
@@ -42,12 +42,6 @@
                     </a>
                     <ul class="sidebar-submenu" id="classes-accordion-list" hidden></ul>
                 </li>
-                <li id="menu-dashboard" class="active"><a href="#" onclick="showSection('dashboard')"><i class="fa-solid fa-chart-line"></i> Статистика</a></li>
-                <li id="menu-assignments"><a href="#" onclick="showSection('assignments')"><i class="fa-regular fa-clipboard"></i> Задачи</a></li>
-                <li id="menu-exercises"><a href="#" onclick="showSection('exercises')"><i class="fa-solid fa-dumbbell"></i> Упражнения</a></li>
-                <li id="menu-classes"><a href="#" onclick="showSection('classes')"><i class="fa-solid fa-user-group"></i> Ученици</a></li>
-                <li id="menu-attendance"><a href="#" onclick="goToClassScopedSection('attendance')"><i class="fa-solid fa-clipboard-check"></i> Присъствие</a></li>
-                <li id="menu-emotions"><a href="#" onclick="goToClassScopedSection('emotions')"><i class="fa-regular fa-face-smile"></i> Емоциометър</a></li>
             </ul>
 
             <ul class="sidebar-menu sidebar-menu-bottom">
@@ -56,7 +50,10 @@
 
             <div class="sidebar-account" id="sidebar-account">
                 <button type="button" class="sidebar-account-toggle" onclick="toggleAccountMenu()">
-                    <span class="row-avatar a0 no-margin">ВП</span>
+                    <span class="row-avatar a0 no-margin account-avatar">
+                        ВП
+                        <img src="assets/admin.png" alt="" class="account-avatar-photo" onerror="this.remove()">
+                    </span>
                     <span class="sidebar-account-info">
                         <strong>Валентин П.</strong>
                         <span>Учител</span>
@@ -95,8 +92,125 @@
                 <button type="button" class="btn-secondary" onclick="exitClassWorkspace()"><i class="fa-solid fa-arrow-left"></i> Всички класове</button>
             </div>
 
-            <!-- СЕКЦИЯ 1: СТАТИСТИКА / ТАБЛО -->
-            <section id="sec-dashboard" class="dashboard-section">
+            <!-- СЕКЦИЯ 0: ТАБЛО - началният екран след вход -->
+            <section id="sec-home" class="dashboard-section">
+                <div class="home-hero">
+                    <div class="home-hero-text">
+                        <span class="home-hero-badge"><span class="live-dot"></span> ТАБЛО</span>
+                        <h1 id="home-greeting">Добър ден 👋</h1>
+                        <p id="home-hero-sub">Ето какво се случва в платформата днес.</p>
+                    </div>
+                    <div class="home-hero-actions">
+                        <button type="button" class="btn-primary" onclick="goToCreateAssignment()"><i class="fa-solid fa-plus"></i> Създай нова задача</button>
+                        <button type="button" class="btn-secondary" onclick="goToAddStudent()"><i class="fa-solid fa-user-plus"></i> Добави ученик</button>
+                    </div>
+                </div>
+
+                <div class="stats-grid stats-grid-5">
+                    <div class="stat-card compact">
+                        <div class="stat-icon blue"><i class="fa-solid fa-users"></i></div>
+                        <div class="stat-data">
+                            <span class="stat-title">Активни ученици</span>
+                            <div class="stat-main">
+                                <strong id="home-stat-students">0</strong>
+                                <span class="stat-sub" id="home-stat-students-sub">в 0 класа</span>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="stat-card compact">
+                        <div class="stat-icon purple"><i class="fa-solid fa-layer-group"></i></div>
+                        <div class="stat-data">
+                            <span class="stat-title">Класове</span>
+                            <div class="stat-main">
+                                <strong id="home-stat-classes">0</strong>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="stat-card compact">
+                        <div class="stat-icon green"><i class="fa-regular fa-clipboard"></i></div>
+                        <div class="stat-data">
+                            <span class="stat-title">Активни задачи</span>
+                            <div class="stat-main">
+                                <strong id="home-stat-active">0</strong>
+                                <span class="stat-sub" id="home-stat-active-sub">от 0 общо</span>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="stat-card compact">
+                        <div class="stat-icon orange"><i class="fa-regular fa-clock"></i></div>
+                        <div class="stat-data">
+                            <span class="stat-title">Със срок днес</span>
+                            <div class="stat-main">
+                                <strong id="home-stat-due-today">0</strong>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="stat-card compact">
+                        <div class="stat-icon amber"><i class="fa-solid fa-inbox"></i></div>
+                        <div class="stat-data">
+                            <span class="stat-title">Предадени работи</span>
+                            <div class="stat-main">
+                                <strong id="home-stat-submissions">0</strong>
+                                <span class="stat-sub">общо</span>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="home-grid">
+                    <div class="home-column">
+                        <div class="table-card">
+                            <div class="table-card-header">
+                                <h3 style="margin:0;">Моите класове</h3>
+                                <button type="button" class="btn-secondary" onclick="goToAddStudent()"><i class="fa-solid fa-plus"></i> Нов клас</button>
+                            </div>
+                            <div class="home-class-grid" id="home-class-grid"></div>
+                        </div>
+
+                        <div class="table-card">
+                            <div class="table-card-header">
+                                <h3 style="margin:0;">Предстоящи срокове</h3>
+                                <button type="button" class="btn-secondary" onclick="goToCreateAssignment()"><i class="fa-solid fa-plus"></i> Нова задача</button>
+                            </div>
+                            <div class="home-deadlines" id="home-deadlines"></div>
+                        </div>
+                    </div>
+
+                    <div class="table-card">
+                        <div class="table-card-header calendar-header">
+                            <h3 style="margin:0;" id="calendar-title">Календар</h3>
+                            <div class="calendar-nav">
+                                <button type="button" class="btn-icon" onclick="shiftCalendarMonth(-1)" title="Предишен месец"><i class="fa-solid fa-chevron-left"></i></button>
+                                <button type="button" class="btn-icon" onclick="goToCalendarToday()" title="Днес"><i class="fa-solid fa-calendar-day"></i></button>
+                                <button type="button" class="btn-icon" onclick="shiftCalendarMonth(1)" title="Следващ месец"><i class="fa-solid fa-chevron-right"></i></button>
+                            </div>
+                        </div>
+                        <div class="calendar-weekdays">
+                            <span>пн</span><span>вт</span><span>ср</span><span>чт</span><span>пт</span><span>сб</span><span>нд</span>
+                        </div>
+                        <div class="calendar-grid" id="calendar-grid"></div>
+                        <div class="calendar-events" id="calendar-events"></div>
+                        <form id="calendar-event-form" class="calendar-event-form">
+                            <input type="text" id="calendar-event-title" class="custom-input" placeholder="Ново събитие..." required>
+                            <input type="date" id="calendar-event-date" class="custom-input" required>
+                            <select id="calendar-event-type" class="custom-select">
+                                <option value="event">Събитие</option>
+                                <option value="exam">Контролно</option>
+                                <option value="meeting">Среща</option>
+                                <option value="holiday">Ваканция</option>
+                            </select>
+                            <button type="submit" class="btn-primary"><i class="fa-solid fa-plus"></i></button>
+                        </form>
+                    </div>
+                </div>
+            </section>
+
+            <!-- СЕКЦИЯ 1: СТАТИСТИКА (в работния панел на клас) -->
+            <section id="sec-dashboard" class="dashboard-section" style="display:none;">
                 <div class="section-header-row">
                     <div class="section-header">
                         <h1>Статистика за предадените задачи</h1>

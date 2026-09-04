@@ -17,6 +17,7 @@
     --word-color: #0284c7;
     --excel-color: #16a34a;
     --ppt-color: #ea580c;
+    --hero-gradient: linear-gradient(120deg, #eff6ff 0%, #f5f3ff 55%, #fdf2f8 100%);
 }
 
 /* Тъмна тема - активира се чрез data-theme="dark" на <html>, превключвана от JS и пазена в localStorage */
@@ -36,6 +37,7 @@
     --badge-amber-text: #fcd34d;
     --badge-red-bg: #7f1d1d;
     --badge-red-text: #fca5a5;
+    --hero-gradient: linear-gradient(120deg, #1e3a5f 0%, #2c2c54 55%, #3b2340 100%);
 }
 
 * {
@@ -1152,6 +1154,327 @@ body {
     grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
 }
 
+/* ---------------------------------------------------------------------------
+   ТАБЛО (начален екран) - поздрав, бързи действия, класове и календар
+   --------------------------------------------------------------------------- */
+.home-hero {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    flex-wrap: wrap;
+    gap: 20px;
+    padding: 26px 28px;
+    margin-bottom: 20px;
+    border-radius: 16px;
+    border: 1px solid var(--border-color);
+    background: var(--hero-gradient);
+}
+
+.home-hero-text {
+    min-width: 0;
+}
+
+.home-hero-badge {
+    display: inline-flex;
+    align-items: center;
+    gap: 7px;
+    font-size: 11px;
+    font-weight: 700;
+    letter-spacing: 0.08em;
+    color: var(--primary-blue);
+    margin-bottom: 10px;
+}
+
+.live-dot {
+    width: 7px;
+    height: 7px;
+    border-radius: 50%;
+    background: var(--primary-blue);
+}
+
+.home-hero-text h1 {
+    font-size: 26px;
+    margin: 0 0 6px;
+    color: var(--text-dark);
+}
+
+.home-hero-text p {
+    font-size: 14px;
+    color: var(--text-muted);
+    margin: 0;
+}
+
+.home-hero-actions {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    flex-wrap: wrap;
+    flex-shrink: 0;
+}
+
+.home-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 20px;
+    align-items: start;
+}
+
+.home-column {
+    display: flex;
+    flex-direction: column;
+    gap: 20px;
+    min-width: 0;
+}
+
+/* Списък с предстоящи срокове на задачи */
+.home-deadlines {
+    display: flex;
+    flex-direction: column;
+}
+
+.home-deadline-row {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    padding: 11px 2px;
+    border-bottom: 1px solid var(--border-color);
+    min-width: 0;
+}
+
+.home-deadline-row:last-child {
+    border-bottom: none;
+}
+
+.home-deadline-info {
+    display: flex;
+    flex-direction: column;
+    flex: 1;
+    min-width: 0;
+}
+
+.home-deadline-info strong {
+    font-size: 13px;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.home-deadline-info span {
+    font-size: 12px;
+    color: var(--text-muted);
+}
+
+/* Плочки на класовете в таблото */
+.home-class-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(150px, 1fr));
+    gap: 12px;
+}
+
+.home-class-card {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding: 12px;
+    border: 1px solid var(--border-color);
+    border-radius: 12px;
+    background: var(--card-bg);
+    cursor: pointer;
+    text-align: left;
+    min-width: 0;
+}
+
+.home-class-card:hover {
+    border-color: var(--primary-blue);
+    background: var(--surface-alt);
+}
+
+.home-class-card-info {
+    display: flex;
+    flex-direction: column;
+    min-width: 0;
+}
+
+.home-class-card-info strong {
+    font-size: 14px;
+    color: var(--text-dark);
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.home-class-card-info span {
+    font-size: 12px;
+    color: var(--text-muted);
+}
+
+/* Календар */
+.calendar-header {
+    align-items: center;
+}
+
+.calendar-nav {
+    display: flex;
+    align-items: center;
+    gap: 4px;
+}
+
+.calendar-weekdays,
+.calendar-grid {
+    display: grid;
+    grid-template-columns: repeat(7, 1fr);
+    gap: 4px;
+}
+
+.calendar-weekdays {
+    margin-bottom: 6px;
+}
+
+.calendar-weekdays span {
+    text-align: center;
+    font-size: 11px;
+    font-weight: 700;
+    color: var(--text-muted);
+    text-transform: uppercase;
+}
+
+.calendar-day {
+    position: relative;
+    aspect-ratio: 1;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    border: 1px solid transparent;
+    border-radius: 8px;
+    background: transparent;
+    color: var(--text-dark);
+    font-size: 13px;
+    cursor: pointer;
+    padding: 0;
+}
+
+.calendar-day:hover {
+    background: var(--surface-alt);
+}
+
+.calendar-day.other-month {
+    color: var(--text-muted);
+    opacity: 0.45;
+}
+
+.calendar-day.today {
+    border-color: var(--primary-blue);
+    font-weight: 700;
+    color: var(--primary-blue);
+}
+
+.calendar-day.selected {
+    background: var(--primary-blue);
+    color: #fff;
+    font-weight: 700;
+}
+
+.calendar-day-dots {
+    position: absolute;
+    bottom: 4px;
+    left: 0;
+    right: 0;
+    display: flex;
+    justify-content: center;
+    gap: 3px;
+}
+
+.calendar-day-dot {
+    width: 5px;
+    height: 5px;
+    border-radius: 50%;
+}
+
+.calendar-day.selected .calendar-day-dot {
+    background: #fff !important;
+}
+
+.calendar-events {
+    margin-top: 14px;
+    padding-top: 14px;
+    border-top: 1px solid var(--border-color);
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+    max-height: 220px;
+    overflow-y: auto;
+}
+
+.calendar-event-row {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    font-size: 13px;
+    min-width: 0;
+}
+
+.calendar-event-bar {
+    width: 4px;
+    align-self: stretch;
+    min-height: 30px;
+    border-radius: 999px;
+    flex-shrink: 0;
+}
+
+.calendar-event-info {
+    display: flex;
+    flex-direction: column;
+    flex: 1;
+    min-width: 0;
+}
+
+.calendar-event-info strong {
+    font-size: 13px;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.calendar-event-info span {
+    font-size: 12px;
+    color: var(--text-muted);
+}
+
+.calendar-event-form {
+    display: flex;
+    gap: 8px;
+    margin-top: 14px;
+    padding-top: 14px;
+    border-top: 1px solid var(--border-color);
+    flex-wrap: wrap;
+}
+
+.calendar-event-form .custom-input {
+    flex: 1;
+    min-width: 120px;
+    margin-top: 0;
+}
+
+.calendar-event-form .custom-select {
+    width: auto;
+    margin-top: 0;
+}
+
+/* Снимка на администратора - показва се върху инициалите, ако файлът съществува */
+.account-avatar {
+    position: relative;
+    overflow: hidden;
+}
+
+.account-avatar-photo {
+    position: absolute;
+    inset: 0;
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+    border-radius: 50%;
+}
+
 .stat-card.compact {
     padding: 16px;
     justify-content: flex-start;
@@ -2193,6 +2516,18 @@ body.student-body {
 
     .stats-grid {
         grid-template-columns: repeat(2, 1fr);
+    }
+
+    .home-grid {
+        grid-template-columns: 1fr;
+    }
+
+    .home-hero {
+        padding: 20px;
+    }
+
+    .home-hero-actions {
+        width: 100%;
     }
 
     .attendance-card-grid,

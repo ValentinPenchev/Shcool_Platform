@@ -735,6 +735,59 @@ async def mark_attendance_bulk(
         raise HTTPException(status_code=500, detail=f"Грешка при масово отбелязване на присъствие: {str(e)}")
 
 # -----------------------------------------------------------------------------
+# 4.1. КАЛЕНДАР СЪС СЪБИТИЯ (собствени събития на учителя - родителски срещи,
+#      контролни, ваканции). Сроковете на задачите се добавят от самия интерфейс,
+#      затова тук се пазят само ръчно въведените събития.
+# -----------------------------------------------------------------------------
+
+@app.get("/api/admin/calendar-events")
+async def get_calendar_events():
+    # Таблицата calendar_events може още да не е създадена в Supabase - в такъв случай
+    # календарът просто показва само сроковете на задачите, вместо да връща грешка.
+    try:
+        res = supabase.table("calendar_events").select("*").order("event_date").execute()
+        return res.data or []
+    except Exception as e:
+        print(f"Забележка при четене на събитията от календара: {e}")
+        return []
+
+@app.post("/api/admin/calendar-events")
+async def create_calendar_event(
+    title: str = Form(...),
+    event_date: str = Form(...),
+    event_type: Optional[str] = Form("event"),
+    class_id: Optional[str] = Form(None)
+):
+    if event_type not in ("event", "exam", "meeting", "holiday"):
+        event_type = "event"
+    try:
+        res = supabase.table("calendar_events").insert({
+            "title": title,
+            "event_date": event_date,
+            "event_type": event_type,
+            "class_id": class_id or None
+        }).execute()
+        return {"status": "success", "data": res.data}
+    except Exception as e:
+        message = str(e)
+        # Докато таблицата не е създадена в Supabase, календарът работи само със
+        # сроковете на задачите - тук казваме ясно какво липсва, вместо суровата грешка
+        if "calendar_events" in message and ("PGRST205" in message or "Could not find the table" in message):
+            raise HTTPException(
+                status_code=503,
+                detail="Таблицата calendar_events още не е създадена в Supabase. Изпълнете SQL заявката за нея и опитайте отново."
+            )
+        raise HTTPException(status_code=500, detail=f"Грешка при запис на събитието: {message}")
+
+@app.delete("/api/admin/calendar-events/{event_id}")
+async def delete_calendar_event(event_id: int):
+    try:
+        supabase.table("calendar_events").delete().eq("id", event_id).execute()
+        return {"status": "success"}
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Грешка при изтриване на събитието: {str(e)}")
+
+# -----------------------------------------------------------------------------
 # 5. ЕМОЦИОМЕТЪР (дневно гласуване по клас - без нужда от парола, за да могат
 #    учениците да гласуват направо от споделен линк, само нулирането е за учителя)
 # -----------------------------------------------------------------------------

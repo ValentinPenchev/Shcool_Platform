@@ -45,6 +45,7 @@
                     </a>
                     <ul class="sidebar-submenu" id="classes-accordion-list" hidden></ul>
                 </li>
+                <li id="menu-files"><a href="#" onclick="showSection('files')"><i class="fa-solid fa-folder-open"></i> Файлове</a></li>
             </ul>
 
             <ul class="sidebar-menu sidebar-menu-bottom">
@@ -89,8 +90,7 @@
                     <button type="button" class="workspace-tab" data-tab="assignments" onclick="showSection('assignments')"><i class="fa-regular fa-clipboard"></i> Задачи</button>
                     <button type="button" class="workspace-tab" data-tab="exercises" onclick="showSection('exercises')"><i class="fa-solid fa-dumbbell"></i> Упражнения</button>
                     <button type="button" class="workspace-tab" data-tab="workspace-students" onclick="showSection('workspace-students')"><i class="fa-solid fa-user-group"></i> Ученици</button>
-                    <button type="button" class="workspace-tab" data-tab="attendance" onclick="showSection('attendance')"><i class="fa-solid fa-clipboard-check"></i> Присъствие</button>
-                    <button type="button" class="workspace-tab" data-tab="emotions" onclick="showSection('emotions')"><i class="fa-regular fa-face-smile"></i> Емоциометър</button>
+                    <button type="button" class="workspace-tab" onclick="openAttendanceApp()"><i class="fa-solid fa-clipboard-check"></i> Присъствие <i class="fa-solid fa-arrow-up-right-from-square tab-external-icon"></i></button>
                 </div>
                 <button type="button" class="btn-secondary" onclick="exitClassWorkspace()"><i class="fa-solid fa-arrow-left"></i> Всички класове</button>
             </div>
@@ -346,34 +346,34 @@
                     <form id="create-assignment-form" class="styled-form">
                         <div class="form-grid">
                             <div class="form-group">
-                                <label>Изберете Клас:</label>
+                                <label><i class="fa-solid fa-users label-icon"></i> Изберете Клас:</label>
                                 <select id="assign-group-select" class="custom-select" required></select>
                             </div>
                             <div class="form-group">
-                                <label>Заглавие на задачата:</label>
+                                <label><i class="fa-regular fa-circle-question label-icon"></i> Заглавие на задачата:</label>
                                 <input type="text" id="assign-title" class="custom-input" placeholder="напр. Упражнение 1 - MS Word" required>
                             </div>
                         </div>
                         <div class="form-grid">
                             <div class="form-group">
-                                <label>Краен срок (незадължително):</label>
+                                <label><i class="fa-regular fa-calendar label-icon"></i> Краен срок (незадължително):</label>
                                 <input type="datetime-local" id="assign-deadline" class="custom-input">
                             </div>
                             <div class="form-group">
-                                <label>Зареди критерии от шаблон:</label>
+                                <label><i class="fa-solid fa-filter label-icon"></i> Зареди критерии от шаблон:</label>
                                 <select id="assign-template-select" class="custom-select">
                                     <option value="">-- Без шаблон --</option>
                                 </select>
                             </div>
                         </div>
                         <div class="form-group">
-                            <label>Качете Word файл / Документ с критерии:</label>
+                            <label><i class="fa-solid fa-paperclip label-icon"></i> Качете Word файл / Документ с критерии:</label>
                             <div class="drop-zone drop-zone-row" id="criteria-drop-zone">
                                 <div class="drop-zone-row-left">
                                     <i class="fa-solid fa-cloud-arrow-up drop-cloud-icon"></i>
                                     <div>
-                                        <p class="drop-text">Изберете файл</p>
-                                        <span class="drop-subtext">или плъзнете файл тук</span>
+                                        <p class="drop-text">Плъзнете файл тук <span class="drop-text-muted">или кликнете, за да изберете</span></p>
+                                        <span class="drop-subtext">Поддържани формати: .docx, .doc, .pdf</span>
                                     </div>
                                 </div>
                                 <button type="button" class="btn-browse" onclick="document.getElementById('criteria-file-input').click()"><i class="fa-regular fa-folder-open"></i> Избор на файл</button>
@@ -391,16 +391,16 @@
                         </div>
                         <div class="form-grid">
                             <div class="form-group">
-                                <label>Помощен материал - файл (незадължително):</label>
+                                <label><i class="fa-regular fa-file label-icon"></i> Помощен материал - файл (незадължително):</label>
                                 <input type="file" id="assign-reference-file" class="custom-input">
                             </div>
                             <div class="form-group">
-                                <label>Помощен материал - линк (незадължително):</label>
+                                <label><i class="fa-solid fa-link label-icon"></i> Помощен материал - линк (незадължително):</label>
                                 <input type="url" id="assign-reference-link" class="custom-input" placeholder="напр. линк към видео/пример">
                             </div>
                         </div>
                         <div class="form-actions">
-                            <button type="submit" class="btn-primary" id="assignment-form-submit-btn"><i class="fa-solid fa-plus"></i> Създай Задача</button>
+                            <button type="submit" class="btn-primary btn-gradient" id="assignment-form-submit-btn"><i class="fa-solid fa-plus"></i> Създай Задача</button>
                             <button type="button" class="btn-secondary" id="assignment-form-cancel-btn" onclick="cancelAssignmentEdit()" style="display:none;">Отказ</button>
                         </div>
                     </form>
@@ -678,33 +678,89 @@
                 </div>
             </section>
 
-            <!-- СЕКЦИЯ (в работния панел на клас): Емоциометър -->
-            <section id="sec-emotions" class="dashboard-section" style="display:none;">
+            <!-- СЕКЦИЯ: ФАЙЛОВЕ - самостоятелна, независима от задачите и класовете -->
+            <section id="sec-files" class="dashboard-section" style="display:none;">
                 <div class="section-header-row">
                     <div class="section-header">
-                        <h1>Емоциометър</h1>
-                        <p class="subtitle" id="emotions-subtitle" style="margin-bottom:0;">Как се чувстват учениците днес?</p>
+                        <h1>Файлове</h1>
+                        <p class="subtitle" style="margin-bottom:0;">Създайте линк за качване на файл, изпратете го и получете файловете тук.</p>
                     </div>
-                    <button type="button" class="btn-secondary" onclick="resetEmotions()"><i class="fa-solid fa-rotate-left"></i> Нулирай емоциите</button>
-                </div>
-
-                <div class="tip-card compact" id="emotions-link-card">
-                    <i class="fa-solid fa-link tip-icon"></i>
-                    <div>
-                        <strong>Линк за гласуване</strong>
-                        <p>Споделете този линк с класа (напр. на общ екран) - всеки ученик може да натисне своята емоция.</p>
-                        <div class="drop-zone-row" style="margin-top:8px; background:transparent; border:1px dashed var(--border-color); padding:10px;">
-                            <a href="#" id="emotions-link-url" target="_blank" class="task-link" style="word-break: break-all;"></a>
-                            <button type="button" class="btn-icon" onclick="copyEmotionsLink()" title="Копирай линка"><i class="fa-regular fa-copy"></i></button>
+                    <div class="tip-card compact">
+                        <i class="fa-regular fa-lightbulb tip-icon"></i>
+                        <div>
+                            <strong>Съвет</strong>
+                            <p>По този линк не се иска име - всеки може просто да качи файл.</p>
                         </div>
                     </div>
                 </div>
 
+                <div class="form-card">
+                    <div class="card-title-row">
+                        <div class="icon-chip purple"><i class="fa-solid fa-link"></i></div>
+                        <div>
+                            <h3>Нова заявка за файл</h3>
+                            <div class="card-subtitle">Всяка заявка получава свой уникален линк за качване</div>
+                        </div>
+                    </div>
+                    <form id="create-file-request-form" class="styled-form">
+                        <div class="form-grid">
+                            <div class="form-group">
+                                <label><i class="fa-regular fa-file-lines label-icon"></i> Заглавие:</label>
+                                <input type="text" id="file-request-title" class="custom-input" placeholder="напр. Снимки от проекта" required>
+                            </div>
+                            <div class="form-group">
+                                <label><i class="fa-regular fa-comment label-icon"></i> Кратко пояснение (незадължително):</label>
+                                <input type="text" id="file-request-note" class="custom-input" placeholder="напр. Качете само една снимка">
+                            </div>
+                        </div>
+                        <div class="form-actions">
+                            <button type="submit" class="btn-primary"><i class="fa-solid fa-plus"></i> Създай линк</button>
+                        </div>
+                    </form>
+                </div>
+
                 <div class="table-card">
                     <div class="table-card-header">
-                        <h3 style="margin:0;">Как се чувстваш днес? Натисни върху емоцията!</h3>
+                        <div class="card-title-row">
+                            <div class="icon-chip blue"><i class="fa-solid fa-paper-plane"></i></div>
+                            <div>
+                                <h3>Заявки за качване</h3>
+                                <div class="card-subtitle">Копирайте линка и го изпратете на когото искате</div>
+                            </div>
+                        </div>
                     </div>
-                    <div id="emotions-grid" class="emotions-grid"></div>
+                    <div id="file-requests-list" class="file-requests-list"></div>
+                </div>
+
+                <div class="table-card">
+                    <div class="table-card-header">
+                        <div class="card-title-row">
+                            <div class="icon-chip green"><i class="fa-solid fa-inbox"></i></div>
+                            <div>
+                                <h3>Получени файлове</h3>
+                                <div class="card-subtitle">Преглед, сваляне и изтриване</div>
+                            </div>
+                        </div>
+                        <select id="file-uploads-filter" class="custom-select file-uploads-filter" onchange="loadFileUploads()">
+                            <option value="">Всички заявки</option>
+                        </select>
+                    </div>
+                    <div class="table-responsive">
+                        <table class="styled-table" id="file-uploads-table">
+                            <thead>
+                                <tr>
+                                    <th>#</th>
+                                    <th>Файл</th>
+                                    <th>Заявка</th>
+                                    <th>Качил</th>
+                                    <th>Размер</th>
+                                    <th>Качен на</th>
+                                    <th>Действия</th>
+                                </tr>
+                            </thead>
+                            <tbody></tbody>
+                        </table>
+                    </div>
                 </div>
             </section>
 

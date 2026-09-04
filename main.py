@@ -765,6 +765,175 @@ async def delete_exercise_upload(upload_id: int):
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Грешка при изтриване: {str(e)}")
 
+# -----------------------------------------------------------------------------
+# ЗАЯВКИ ЗА ФАЙЛОВЕ - самостоятелен модул, независим от задачите и упражненията.
+# Учителят създава заявка с уникален линк, ученикът качва файл по него (без да е
+# длъжен да се представя), а качените файлове се управляват от админ панела.
+# -----------------------------------------------------------------------------
+def _is_missing_table_error(message: str, table: str) -> bool:
+    """Разпознава грешката на PostgREST, когато таблицата още не е създадена в Supabase."""
+    return table in message and ("PGRST205" in message or "Could not find the table" in message)
+
+FILE_REQUEST_ALLOWED_EXTENSIONS = {
+    "doc", "docx", "xls", "xlsx", "ppt", "pptx", "pdf", "txt", "csv", "png", "jpg", "jpeg"
+}
+
+@app.post("/api/admin/file-requests")
+async def create_file_request(title: str = Form(...), note: str = Form("")):
+    request_id = uuid.uuid4().hex[:8]
+    try:
+        supabase.table("file_requests").insert({
+            "request_id": request_id,
+            "title": title,
+            "note": note or None,
+        }).execute()
+    except Exception as e:
+        if _is_missing_table_error(str(e), "file_requests"):
+            raise HTTPException(
+                status_code=503,
+                detail="Таблиците за модула Файлове още не са създадени в Supabase. Изпълнете sql/file_requests.sql и опитайте отново."
+            )
+        raise HTTPException(status_code=500, detail=f"Грешка при създаване на заявката: {str(e)}")
+
+    return {"status": "success", "request_id": request_id, "title": title}
+
+@app.get("/api/admin/file-requests")
+async def list_file_requests():
+    try:
+        res = supabase.table("file_requests").select("*").order("created_at", desc=True).execute()
+        requests_data = res.data or []
+    except Exception as e:
+        if _is_missing_table_error(str(e), "file_requests"):
+            raise HTTPException(
+                status_code=503,
+                detail="Таблиците за модула Файлове още не са създадени в Supabase. Изпълнете sql/file_requests.sql и опитайте отново."
+            )
+        raise HTTPException(status_code=500, detail=f"Грешка при четене на заявките: {str(e)}")
+
+    # Брой качени файлове за всяка заявка, за да се вижда в списъка
+    try:
+        uploads_res = supabase.table("file_request_uploads").select("request_id").execute()
+        counts = {}
+        for row in (uploads_res.data or []):
+            counts[row["request_id"]] = counts.get(row["request_id"], 0) + 1
+    except Exception:
+        counts = {}
+
+    for item in requests_data:
+        item["upload_count"] = counts.get(item.get("request_id"), 0)
+
+    return requests_data
+
+@app.delete("/api/admin/file-requests/{request_id}")
+async def delete_file_request(request_id: str):
+    """Трие заявката заедно с всички качени по нея файлове (запис + файл в Storage)."""
+    try:
+        uploads = supabase.table("file_request_uploads").select("id, storage_path") \
+            .eq("request_id", request_id).execute()
+        paths = [u["storage_path"] for u in (uploads.data or []) if u.get("storage_path")]
+        if paths:
+            try:
+                supabase.storage.from_(BUCKET_NAME).remove(paths)
+            except Exception as e:
+                print(f"Забележка при изтриване на файлове от Storage: {e}")
+
+        supabase.table("file_request_uploads").delete().eq("request_id", request_id).execute()
+        supabase.table("file_requests").delete().eq("request_id", request_id).execute()
+        return {"status": "success", "message": f"Заявката {request_id} е изтрита."}
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Грешка при изтриване: {str(e)}")
+
+@app.get("/api/admin/file-request-uploads")
+async def list_file_request_uploads(request_id: Optional[str] = None):
+    try:
+        query = supabase.table("file_request_uploads").select("*")
+        if request_id:
+            query = query.eq("request_id", request_id)
+        res = query.order("created_at", desc=True).execute()
+        return res.data or []
+    except Exception as e:
+        if _is_missing_table_error(str(e), "file_request_uploads"):
+            return []
+        raise HTTPException(status_code=500, detail=f"Грешка при четене на файловете: {str(e)}")
+
+@app.delete("/api/admin/file-request-uploads/{upload_id}")
+async def delete_file_request_upload(upload_id: int):
+    try:
+        res = supabase.table("file_request_uploads").select("storage_path").eq("id", upload_id).execute()
+        if res.data and res.data[0].get("storage_path"):
+            try:
+                supabase.storage.from_(BUCKET_NAME).remove([res.data[0]["storage_path"]])
+            except Exception as e:
+                print(f"Забележка при изтриване на файла от Storage: {e}")
+
+        supabase.table("file_request_uploads").delete().eq("id", upload_id).execute()
+        return {"status": "success", "message": f"Файлът {upload_id} е изтрит."}
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Грешка при изтриване: {str(e)}")
+
+@app.get("/api/file-request/{request_id}")
+async def get_file_request_public(request_id: str):
+    """Публична информация за заявката - ползва се от страницата за качване."""
+    try:
+        res = supabase.table("file_requests").select("request_id, title, note") \
+            .eq("request_id", request_id).execute()
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Грешка при четене: {str(e)}")
+
+    if not res.data:
+        raise HTTPException(status_code=404, detail="Заявката не е намерена или е изтрита.")
+    return res.data[0]
+
+@app.post("/api/file-request/{request_id}/upload")
+async def upload_for_file_request(
+    request: Request,
+    request_id: str,
+    file: UploadFile = File(...),
+    uploader_name: str = Form("")
+):
+    """Качване по уникален линк. Името е незадължително - може само файл."""
+    _check_rate_limit(request)
+
+    try:
+        found = supabase.table("file_requests").select("request_id").eq("request_id", request_id).execute()
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Грешка при проверка на заявката: {str(e)}")
+    if not found.data:
+        raise HTTPException(status_code=404, detail="Заявката не е намерена или е изтрита.")
+
+    extension = (file.filename or "").rsplit(".", 1)[-1].lower() if "." in (file.filename or "") else ""
+    if extension not in FILE_REQUEST_ALLOWED_EXTENSIONS:
+        raise HTTPException(
+            status_code=400,
+            detail="Форматът не се поддържа. Позволени са: Word, Excel, PowerPoint, PDF, TXT, CSV, PNG, JPEG."
+        )
+
+    contents = await file.read()
+    name_part = sanitize_storage_segment(uploader_name) if uploader_name.strip() else "anonimen"
+    storage_path = (
+        f"file-requests/{sanitize_storage_segment(request_id)}/"
+        f"{name_part}_{uuid.uuid4().hex[:6]}_{sanitize_storage_segment(file.filename)}"
+    )
+
+    try:
+        file_url = upload_to_supabase(contents, file.filename, storage_path)
+    except Exception:
+        file_url = "#"
+
+    try:
+        supabase.table("file_request_uploads").insert({
+            "request_id": request_id,
+            "uploader_name": uploader_name.strip() or None,
+            "filename": file.filename,
+            "storage_path": storage_path,
+            "file_url": file_url,
+            "size_bytes": len(contents),
+        }).execute()
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Грешка при запис на качването: {str(e)}")
+
+    return {"status": "success", "filename": file.filename}
+
 @app.get("/api/admin/exercise-grades")
 async def get_exercise_grades(group_id: Optional[str] = None):
     try:

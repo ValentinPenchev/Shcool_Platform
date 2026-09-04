@@ -380,9 +380,10 @@ function showSection(sectionId) {
         loadAttendanceData();
     }
 
-    if (sectionId === 'emotions') {
-        loadEmotionsData();
+    if (sectionId === 'files') {
+        loadFilesSection();
     }
+
 
     if (sectionId === 'home') {
         // Горната лента е контекст на конкретен клас - на Таблото никога не се показва,
@@ -1411,117 +1412,6 @@ async function markAllAttendance(status) {
     }
 }
 
-// -----------------------------------------------------------------------------
-// ЕМОЦИОМЕТЪР - дневно гласуване по клас (публичен линк + изглед/нулиране в панела)
-// -----------------------------------------------------------------------------
-const EMOTION_CONFIG = {
-    "Щастлив": { emoji: "😊", cssClass: "happy" },
-    "Тъжен": { emoji: "😢", cssClass: "sad" },
-    "Кисел": { emoji: "😖", cssClass: "sour" },
-    "Доволен": { emoji: "😌", cssClass: "content" },
-    "Любопитен": { emoji: "🤔", cssClass: "curious" },
-    "Притеснен": { emoji: "😰", cssClass: "worried" },
-    "Влюбен": { emoji: "😍", cssClass: "love" }
-};
-
-function buildEmotionsLink(classId) {
-    return `${window.location.origin}${getSiteBasePath()}index.html?mood=${encodeURIComponent(classId)}`;
-}
-
-function copyEmotionsLink() {
-    if (!lockedClassId) return;
-    const url = buildEmotionsLink(lockedClassId);
-    navigator.clipboard?.writeText(url).then(() => {
-        showToast("Линкът е копиран.", "success");
-    }).catch(() => {
-        prompt("Копирайте линка ръчно:", url);
-    });
-}
-
-async function loadEmotionsData() {
-    if (!lockedClassId) return;
-    const data = classesData[lockedClassId];
-    document.getElementById("emotions-subtitle").textContent = `Клас: ${data ? data.className : lockedClassId} · Как се чувстват учениците днес?`;
-
-    const url = buildEmotionsLink(lockedClassId);
-    document.getElementById("emotions-link-url").href = url;
-    document.getElementById("emotions-link-url").textContent = url;
-
-    const today = formatDateForInput(new Date());
-    try {
-        const res = await fetch(`${API_URL}/emotions?group_id=${encodeURIComponent(lockedClassId)}&record_date=${today}`);
-        if (!res.ok) throw new Error("Грешка при заявката към сървъра");
-        emotionCounts = await res.json();
-    } catch (err) {
-        console.error("Грешка при зареждане на емоциите:", err);
-        emotionCounts = {};
-    }
-
-    renderEmotionsGrid();
-}
-
-let emotionCounts = {};
-
-function renderEmotionsGrid() {
-    const container = document.getElementById("emotions-grid");
-    if (!container) return;
-    container.innerHTML = Object.keys(EMOTION_CONFIG).map(emotion => {
-        const cfg = EMOTION_CONFIG[emotion];
-        const count = emotionCounts[emotion] || 0;
-        return `
-            <button type="button" class="emotion-btn ${cfg.cssClass}" data-emotion="${emotion}" onclick="voteEmotionFromAdmin('${emotion}')">
-                <span class="emotion-emoji">${cfg.emoji}</span>
-                <span class="emotion-label">${emotion}</span>
-                <span class="emotion-count">${count} ${count === 1 ? 'глас' : 'гласа'}</span>
-            </button>
-        `;
-    }).join("");
-}
-
-async function voteEmotionFromAdmin(emotion) {
-    if (!lockedClassId) return;
-    const today = formatDateForInput(new Date());
-    const formData = new FormData();
-    formData.append("class_id", lockedClassId);
-    formData.append("record_date", today);
-    formData.append("emotion", emotion);
-
-    try {
-        const res = await fetch(`${API_URL}/emotions/vote`, { method: "POST", body: formData });
-        if (!res.ok) throw new Error("Грешка при заявката към сървъра");
-        const result = await res.json();
-        emotionCounts[emotion] = result.count;
-        renderEmotionsGrid();
-        const btn = document.querySelector(`.emotion-btn[data-emotion="${CSS.escape(emotion)}"]`);
-        if (btn) {
-            btn.classList.add("pulse");
-            setTimeout(() => btn.classList.remove("pulse"), 400);
-        }
-    } catch (err) {
-        showToast("Грешка при гласуване: " + err.message, "error");
-    }
-}
-
-async function resetEmotions() {
-    if (!lockedClassId) return;
-    if (!confirm("Сигурни ли сте, че искате да нулирате емоциите за днес?")) return;
-
-    const today = formatDateForInput(new Date());
-    const formData = new FormData();
-    formData.append("class_id", lockedClassId);
-    formData.append("record_date", today);
-
-    try {
-        const res = await adminFetch(`${API_URL}/admin/emotions/reset`, { method: "POST", body: formData });
-        if (!res.ok) throw new Error("Грешка при заявката към сървъра");
-        emotionCounts = {};
-        renderEmotionsGrid();
-        showToast("Емоциите бяха нулирани.", "success");
-    } catch (err) {
-        showToast("Грешка при нулиране: " + err.message, "error");
-    }
-}
-
 // Последно заредения (евентуално филтриран по клас) списък със задачи - използва се за локалното търсене
 let assignmentsCache = [];
 
@@ -1588,6 +1478,207 @@ function filterAssignmentsBySearch() {
 // Пътят на текущата страница (без файла), за да работи линкът и при хостване в подпапка (напр. GitHub Pages project site)
 function getSiteBasePath() {
     return window.location.pathname.replace(/[^/]*$/, '');
+}
+
+// Присъствието се води във външно приложение - отваря се в нов таб
+const ATTENDANCE_APP_URL = "https://vpclassroom-manageme-wl5w.bolt.host/";
+
+function openAttendanceApp() {
+    window.open(ATTENDANCE_APP_URL, "_blank", "noopener");
+}
+
+// -----------------------------------------------------------------------------
+// ФАЙЛОВЕ - самостоятелен модул: заявка с уникален линк, по който всеки може да
+// качи файл (без задължително име), а файловете се управляват оттук
+// -----------------------------------------------------------------------------
+let fileRequestsCache = [];
+
+function buildFileRequestLink(requestId) {
+    return `${window.location.origin}${getSiteBasePath()}index.html?files=${encodeURIComponent(requestId)}`;
+}
+
+function formatFileSize(bytes) {
+    if (!bytes && bytes !== 0) return "—";
+    if (bytes < 1024) return `${bytes} B`;
+    if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} KB`;
+    return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
+}
+
+async function loadFilesSection() {
+    await loadFileRequests();
+    await loadFileUploads();
+}
+
+async function loadFileRequests() {
+    const list = document.getElementById("file-requests-list");
+    if (!list) return;
+
+    try {
+        const res = await adminFetch(`${API_URL}/admin/file-requests`);
+        if (!res.ok) {
+            const errData = await res.json().catch(() => ({}));
+            throw new Error(errData.detail || `HTTP грешка: ${res.status}`);
+        }
+        fileRequestsCache = await res.json();
+    } catch (err) {
+        list.innerHTML = `
+            <div class="empty-state">
+                <div class="empty-icon"><i class="fa-solid fa-triangle-exclamation"></i></div>
+                <h4>Модулът още не е готов</h4>
+                <p>${err.message}</p>
+            </div>`;
+        return;
+    }
+
+    const filter = document.getElementById("file-uploads-filter");
+    if (filter) {
+        const current = filter.value;
+        filter.innerHTML = `<option value="">Всички заявки</option>` +
+            fileRequestsCache.map(r => `<option value="${r.request_id}">${r.title}</option>`).join("");
+        filter.value = current;
+    }
+
+    if (fileRequestsCache.length === 0) {
+        list.innerHTML = `
+            <div class="empty-state">
+                <div class="empty-icon"><i class="fa-solid fa-link"></i></div>
+                <h4>Още няма заявки</h4>
+                <p>Създайте първата заявка отгоре, за да получите линк за качване.</p>
+            </div>`;
+        return;
+    }
+
+    list.innerHTML = fileRequestsCache.map(req => {
+        const link = buildFileRequestLink(req.request_id);
+        return `
+            <div class="file-request-row">
+                <div class="file-request-info">
+                    <strong>${req.title}</strong>
+                    ${req.note ? `<span class="file-request-note">${req.note}</span>` : ""}
+                    <a href="${link}" target="_blank" rel="noopener" class="task-link file-request-link">${link}</a>
+                </div>
+                <span class="badge-status">${req.upload_count || 0} файла</span>
+                <div class="file-request-actions">
+                    <button type="button" class="btn-icon" title="Копирай линка" onclick="copyFileRequestLink('${req.request_id}')"><i class="fa-regular fa-copy"></i></button>
+                    <button type="button" class="btn-danger-icon" title="Изтрий заявката и файловете по нея" onclick="deleteFileRequest('${req.request_id}', ${JSON.stringify(req.title).replace(/"/g, '&quot;')})"><i class="fa-regular fa-trash-can"></i></button>
+                </div>
+            </div>`;
+    }).join("");
+}
+
+function copyFileRequestLink(requestId) {
+    const link = buildFileRequestLink(requestId);
+    navigator.clipboard.writeText(link)
+        .then(() => showToast("Линкът е копиран.", "success"))
+        .catch(() => showToast("Копирането не бе разрешено от браузъра.", "error"));
+}
+
+async function createFileRequest(event) {
+    event.preventDefault();
+    const title = document.getElementById("file-request-title").value.trim();
+    const note = document.getElementById("file-request-note").value.trim();
+    if (!title) return;
+
+    const formData = new FormData();
+    formData.append("title", title);
+    formData.append("note", note);
+
+    try {
+        const res = await adminFetch(`${API_URL}/admin/file-requests`, { method: "POST", body: formData });
+        if (res.status === 404 || res.status === 405) {
+            throw new Error("Сървърът още не е обновен с модула за файлове. Изчакайте внедряването в Render.");
+        }
+        if (!res.ok) {
+            const errData = await res.json().catch(() => ({}));
+            throw new Error(errData.detail || `HTTP грешка: ${res.status}`);
+        }
+
+        document.getElementById("create-file-request-form").reset();
+        showToast("Линкът за качване е готов.", "success");
+        await loadFileRequests();
+    } catch (err) {
+        showToast("Грешка: " + err.message, "error");
+    }
+}
+
+async function deleteFileRequest(requestId, title) {
+    if (!confirm(`Да се изтрие ли заявката "${title}" заедно с всички качени по нея файлове?`)) return;
+
+    try {
+        const res = await adminFetch(`${API_URL}/admin/file-requests/${requestId}`, { method: "DELETE" });
+        if (!res.ok) throw new Error(`HTTP грешка: ${res.status}`);
+        showToast("Заявката е изтрита.", "success");
+        await loadFilesSection();
+    } catch (err) {
+        showToast("Грешка при изтриване: " + err.message, "error");
+    }
+}
+
+async function loadFileUploads() {
+    const tbody = document.querySelector("#file-uploads-table tbody");
+    if (!tbody) return;
+
+    const requestId = document.getElementById("file-uploads-filter")?.value || "";
+    const query = requestId ? `?request_id=${encodeURIComponent(requestId)}` : "";
+
+    let uploads = [];
+    try {
+        const res = await adminFetch(`${API_URL}/admin/file-request-uploads${query}`);
+        if (!res.ok) throw new Error(`HTTP грешка: ${res.status}`);
+        uploads = await res.json();
+    } catch (err) {
+        tbody.innerHTML = `<tr><td colspan="7"><div class="empty-state"><h4>Няма връзка със сървъра</h4><p>${err.message}</p></div></td></tr>`;
+        return;
+    }
+
+    if (uploads.length === 0) {
+        tbody.innerHTML = `
+            <tr><td colspan="7">
+                <div class="empty-state">
+                    <div class="empty-icon"><i class="fa-solid fa-inbox"></i></div>
+                    <h4>Няма качени файлове</h4>
+                    <p>Файловете, качени по вашите линкове, ще се появят тук.</p>
+                </div>
+            </td></tr>`;
+        return;
+    }
+
+    const titleByRequest = {};
+    fileRequestsCache.forEach(r => { titleByRequest[r.request_id] = r.title; });
+
+    tbody.innerHTML = uploads.map((u, i) => {
+        const safeName = JSON.stringify(u.filename || "Файл").replace(/"/g, '&quot;');
+        const uploader = u.uploader_name || '<span class="stat-sub">Анонимен</span>';
+        return `
+            <tr>
+                <td>${i + 1}</td>
+                <td><div class="file-name-cell"><i class="fa-regular fa-file-lines"></i>${u.filename || "Файл"}</div></td>
+                <td>${titleByRequest[u.request_id] || u.request_id}</td>
+                <td>${uploader}</td>
+                <td>${formatFileSize(u.size_bytes)}</td>
+                <td>${formatSubmittedAt(u.created_at)}</td>
+                <td>
+                    <button type="button" class="btn-icon" title="Прегледай" onclick="openFilePreview('${u.file_url}', ${safeName}, ${JSON.stringify(formatSubmittedAt(u.created_at)).replace(/"/g, '&quot;')})"><i class="fa-regular fa-eye"></i></button>
+                    <a href="${u.file_url}" download="${u.filename || ''}" class="btn-icon" title="Свали"><i class="fa-solid fa-download"></i></a>
+                    <button type="button" class="btn-danger-icon" title="Изтрий" onclick="deleteFileUpload(${u.id})"><i class="fa-regular fa-trash-can"></i></button>
+                </td>
+            </tr>`;
+    }).join("");
+}
+
+document.getElementById("create-file-request-form")?.addEventListener("submit", createFileRequest);
+
+async function deleteFileUpload(uploadId) {
+    if (!confirm("Да се изтрие ли този файл?")) return;
+
+    try {
+        const res = await adminFetch(`${API_URL}/admin/file-request-uploads/${uploadId}`, { method: "DELETE" });
+        if (!res.ok) throw new Error(`HTTP грешка: ${res.status}`);
+        showToast("Файлът е изтрит.", "success");
+        await loadFilesSection();
+    } catch (err) {
+        showToast("Грешка при изтриване: " + err.message, "error");
+    }
 }
 
 function buildStudentLink(assignmentId) {

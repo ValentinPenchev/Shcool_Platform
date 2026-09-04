@@ -2497,6 +2497,114 @@ body.student-body {
     margin-bottom: 12px;
 }
 
+/* Плаващ бутон към админ панела на ученическата страница */
+.admin-fab {
+    position: fixed;
+    right: 20px;
+    bottom: 20px;
+    z-index: 900;
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    padding: 11px 16px;
+    border-radius: 999px;
+    background: var(--card-bg);
+    color: var(--text-dark);
+    border: 1px solid var(--border-color);
+    box-shadow: var(--shadow-md);
+    font-size: 13px;
+    font-weight: 600;
+    text-decoration: none;
+    transition: transform 0.18s ease, box-shadow 0.18s ease, color 0.18s ease;
+}
+
+.admin-fab:hover {
+    color: var(--primary-blue);
+    transform: translateY(-2px);
+    box-shadow: var(--shadow-lg);
+}
+
+/* Градиентен основен бутон (формата за създаване на задача) */
+.btn-gradient {
+    background: linear-gradient(135deg, #2563eb 0%, #6d28d9 100%);
+    border: none;
+}
+
+.btn-gradient:hover:not(:disabled) {
+    background: linear-gradient(135deg, #1d4ed8 0%, #5b21b6 100%);
+}
+
+.drop-text-muted {
+    font-weight: 500;
+    color: var(--text-muted);
+}
+
+/* Малка икона до етикетите във формите */
+.label-icon {
+    color: var(--primary-blue);
+    margin-right: 6px;
+    font-size: 12px;
+}
+
+/* Външна препратка в раздел на работния панел */
+.tab-external-icon {
+    font-size: 10px;
+    opacity: 0.75;
+}
+
+/* Заявки за качване на файл */
+.file-requests-list {
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+}
+
+.file-request-row {
+    display: flex;
+    align-items: center;
+    gap: 14px;
+    flex-wrap: wrap;
+    padding: 14px 16px;
+    border: 1px solid var(--border-color);
+    border-radius: var(--radius-md);
+    background: var(--surface-alt);
+}
+
+.file-request-info {
+    display: flex;
+    flex-direction: column;
+    gap: 3px;
+    flex: 1;
+    min-width: 0;
+}
+
+.file-request-info strong {
+    font-size: 14px;
+}
+
+.file-request-note {
+    font-size: 12px;
+    color: var(--text-muted);
+}
+
+.file-request-link {
+    font-size: 12px;
+    word-break: break-all;
+}
+
+.file-request-actions {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    flex-shrink: 0;
+}
+
+.file-uploads-filter {
+    width: auto;
+    min-width: 190px;
+    margin-top: 0;
+}
+
 /* Преглед на файл преди сваляне */
 .file-preview-overlay {
     position: fixed;

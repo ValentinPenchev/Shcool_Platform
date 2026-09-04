@@ -6,7 +6,14 @@ const urlParams = new URLSearchParams(window.location.search);
 const assignmentId = urlParams.get('id');
 const exerciseClassId = urlParams.get('exercise');
 const moodClassId = urlParams.get('mood');
-const pageMode = assignmentId ? 'assignment' : (exerciseClassId ? 'exercise' : (moodClassId ? 'mood' : null));
+// ?files=<request_id> - самостоятелна заявка за файл, при която името не е задължително
+const fileRequestId = urlParams.get('files');
+const pageMode = assignmentId ? 'assignment'
+    : (exerciseClassId ? 'exercise'
+    : (moodClassId ? 'mood'
+    : (fileRequestId ? 'filerequest' : null)));
+
+const FILE_REQUEST_ACCEPT = ".docx,.doc,.xlsx,.xls,.pptx,.ppt,.pdf,.txt,.csv,.png,.jpg,.jpeg";
 
 let selectedFile = null;
 let assignmentData = null;
@@ -27,9 +34,48 @@ function loadPageContext() {
     if (pageMode === 'assignment') return loadAssignment();
     if (pageMode === 'exercise') return loadExerciseClass();
     if (pageMode === 'mood') return loadMoodClass();
+    if (pageMode === 'filerequest') return loadFileRequest();
 
     showAlert("Липсва линк към задача или клас. Помолете учителя за индивидуалния линк.");
     document.getElementById("submission-form").style.display = "none";
+}
+
+// Режим "заявка за файл" - показва заглавието на заявката и разхлабва формата:
+// името става незадължително текстово поле, а разрешените формати са по-широки
+async function loadFileRequest() {
+    const nameSelect = document.getElementById("student-select");
+    const nameInput = document.createElement("input");
+    nameInput.type = "text";
+    nameInput.id = "uploader-name";
+    nameInput.className = "custom-input";
+    nameInput.placeholder = "Име (незадължително)";
+    nameSelect.replaceWith(nameInput);
+    document.querySelector('label[for="student-select"]').textContent = "Вашето име (незадължително)";
+
+    const fileInput = document.getElementById("file-input");
+    fileInput.setAttribute("accept", FILE_REQUEST_ACCEPT);
+    document.querySelector(".file-field-wrapper label").textContent = "Изберете файл";
+
+    const formatsBanner = document.querySelector(".info-banner p");
+    if (formatsBanner) {
+        formatsBanner.textContent = "Word, Excel, PowerPoint, PDF, TXT, CSV, PNG, JPEG";
+    }
+
+    const submitBtn = document.getElementById("submit-btn");
+    if (submitBtn) submitBtn.innerHTML = '<i class="fa-solid fa-cloud-arrow-up"></i> Качи файла';
+
+    try {
+        const res = await fetch(`${API_URL}/file-request/${encodeURIComponent(fileRequestId)}`);
+        if (!res.ok) throw new Error("Линкът не е валиден или заявката е изтрита.");
+        const data = await res.json();
+
+        document.querySelector(".card-header h1").textContent = data.title || "Качване на файл";
+        document.getElementById("assignment-subtitle").textContent =
+            data.note || "Изберете файл и го качете - името не е задължително.";
+    } catch (err) {
+        showAlert(err.message || "Грешка при зареждане на заявката.");
+        document.getElementById("submission-form").style.display = "none";
+    }
 }
 
 // Зареждане на информацията за задачата (клас, критерии) и списъка с ученици
@@ -246,6 +292,14 @@ function setupSubmissionForm() {
     document.getElementById("submission-form")?.addEventListener("submit", async (e) => {
         e.preventDefault();
 
+        if (pageMode === 'filerequest') {
+            if (!selectedFile) {
+                alert("Моля, изберете файл за качване.");
+                return;
+            }
+            return submitFileRequestUpload();
+        }
+
         const studentName = document.getElementById("student-select").value;
         if (!studentName) {
             alert("Моля, изберете вашето име.");
@@ -301,6 +355,44 @@ function setupSubmissionForm() {
             submitBtn.innerHTML = originalBtnHtml;
         }
     });
+}
+
+// Качване по заявка за файл - без проверка и без задължително име
+async function submitFileRequestUpload() {
+    const submitBtn = document.getElementById("submit-btn");
+    const originalBtnHtml = submitBtn.innerHTML;
+    submitBtn.disabled = true;
+    submitBtn.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> Качване...';
+
+    const formData = new FormData();
+    formData.append("file", selectedFile);
+    formData.append("uploader_name", document.getElementById("uploader-name")?.value.trim() || "");
+
+    try {
+        const res = await fetch(`${API_URL}/file-request/${encodeURIComponent(fileRequestId)}/upload`, {
+            method: "POST",
+            body: formData
+        });
+        if (!res.ok) {
+            const errData = await res.json().catch(() => ({}));
+            throw new Error(errData.detail || `HTTP грешка: ${res.status}`);
+        }
+        const result = await res.json();
+
+        document.getElementById("submission-form").style.display = "none";
+        document.getElementById("page-alert").style.display = "none";
+        document.getElementById("result-title").textContent = "Файлът е качен успешно!";
+        document.getElementById("result-filename").textContent = result.filename || "";
+        ["result-score-row", "result-grade", "result-exercise-progress"].forEach(id => {
+            const el = document.getElementById(id);
+            if (el) el.style.display = "none";
+        });
+        document.getElementById("result-panel").style.display = "block";
+    } catch (err) {
+        alert("Грешка при качването: " + err.message);
+        submitBtn.disabled = false;
+        submitBtn.innerHTML = originalBtnHtml;
+    }
 }
 
 function showResult(result) {

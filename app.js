@@ -56,10 +56,13 @@ async function loadFileRequest() {
     fileInput.setAttribute("accept", FILE_REQUEST_ACCEPT);
     document.querySelector(".file-field-wrapper label").textContent = "Изберете файл";
 
-    const formatsBanner = document.querySelector(".info-banner p");
-    if (formatsBanner) {
-        formatsBanner.textContent = "Word, Excel, PowerPoint, PDF, TXT, CSV, PNG, JPEG";
+    const formatsText = document.getElementById("formats-text");
+    if (formatsText) {
+        formatsText.textContent = "Позволени са: Word, Excel, PowerPoint, PDF, TXT, CSV, PNG, JPEG";
     }
+    // Значките W/X/P важат само за режима със задачите
+    const formatBadges = document.getElementById("format-badges");
+    if (formatBadges) formatBadges.style.display = "none";
 
     const submitBtn = document.getElementById("submit-btn");
     if (submitBtn) submitBtn.innerHTML = '<i class="fa-solid fa-cloud-arrow-up"></i> Качи файла';
@@ -69,7 +72,7 @@ async function loadFileRequest() {
         if (!res.ok) throw new Error("Линкът не е валиден или заявката е изтрита.");
         const data = await res.json();
 
-        document.querySelector(".card-header h1").textContent = data.title || "Качване на файл";
+        document.getElementById("submission-title").textContent = data.title || "Качване на файл";
         document.getElementById("assignment-subtitle").textContent =
             data.note || "Изберете файл и го качете - името не е задължително.";
     } catch (err) {

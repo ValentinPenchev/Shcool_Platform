@@ -40,41 +40,49 @@
     --tint-border-purple: #ede9fe;
     --tint-border-orange: #ffedd5;
     --tint-border-amber: #fef3c7;
+    --tint-red: #fef2f2;
+    --tint-border-red: #fecaca;
+    color-scheme: light;
 }
 
-/* Тъмна тема - активира се чрез data-theme="dark" на <html>, превключвана от JS и пазена в localStorage */
+/* Тъмна тема - активира се чрез data-theme="dark" на <html>, превключвана от JS и пазена в localStorage.
+   По-тъмен и по-контрастен фон (--bg-main) спрямо картите (--card-bg), и много по-видими рамки
+   (--border-color), за да не се "сливат" картите/полетата една с друга. */
 :root[data-theme="dark"] {
-    --bg-main: #0f172a;
-    --sidebar-bg: #1e293b;
-    --primary-blue: #3b82f6;
-    --primary-hover: #60a5fa;
-    --text-dark: #e2e8f0;
-    --text-muted: #94a3b8;
-    --border-color: #334155;
-    --card-bg: #1e293b;
-    --surface-alt: #273549;
+    --bg-main: #0a0f1d;
+    --sidebar-bg: #141d31;
+    --primary-blue: #4c8bff;
+    --primary-hover: #75a4ff;
+    --text-dark: #eef2f8;
+    --text-muted: #a1aec4;
+    --border-color: #3a4a68;
+    --card-bg: #141d31;
+    --surface-alt: #1c2740;
     --badge-green-bg: #14532d;
     --badge-green-text: #86efac;
     --badge-amber-bg: #78350f;
     --badge-amber-text: #fcd34d;
     --badge-red-bg: #7f1d1d;
     --badge-red-text: #fca5a5;
-    --hero-gradient: linear-gradient(120deg, #1e3a5f 0%, #2c2c54 55%, #3b2340 100%);
-    --shadow-sm: 0 1px 2px rgba(0, 0, 0, 0.24), 0 1px 3px rgba(0, 0, 0, 0.2);
-    --shadow-md: 0 4px 14px rgba(0, 0, 0, 0.3), 0 2px 4px rgba(0, 0, 0, 0.2);
-    --shadow-lg: 0 12px 28px rgba(0, 0, 0, 0.4);
-    --focus-ring: 0 0 0 3px rgba(59, 130, 246, 0.28);
-    --accent-soft: #1e3a5f;
-    --tint-blue: #1b2b45;
-    --tint-green: #162a22;
+    --hero-gradient: linear-gradient(120deg, #17273f 0%, #241f3d 55%, #33203a 100%);
+    --shadow-sm: 0 1px 2px rgba(0, 0, 0, 0.35), 0 1px 3px rgba(0, 0, 0, 0.3);
+    --shadow-md: 0 4px 14px rgba(0, 0, 0, 0.4), 0 2px 4px rgba(0, 0, 0, 0.3);
+    --shadow-lg: 0 12px 28px rgba(0, 0, 0, 0.5);
+    --focus-ring: 0 0 0 3px rgba(76, 139, 255, 0.35);
+    --accent-soft: #1c3357;
+    --tint-blue: #16233d;
+    --tint-green: #122a20;
     --tint-purple: #241f3d;
     --tint-orange: #2b2118;
     --tint-amber: #2a2517;
-    --tint-border-blue: #2c4569;
-    --tint-border-green: #234436;
-    --tint-border-purple: #362f57;
-    --tint-border-orange: #43331f;
-    --tint-border-amber: #423a1f;
+    --tint-red: #34191c;
+    --tint-border-blue: #2f4d78;
+    --tint-border-green: #245239;
+    --tint-border-purple: #3d3466;
+    --tint-border-orange: #4a3620;
+    --tint-border-amber: #493d1e;
+    --tint-border-red: #5c2a2f;
+    color-scheme: dark;
 }
 
 * {
@@ -695,7 +703,7 @@ body {
 /* "Съвет" карти */
 .tip-card {
     background: var(--accent-soft);
-    border: 1px solid #dbeafe;
+    border: 1px solid var(--tint-border-blue);
     border-radius: 12px;
     padding: 14px 18px;
     display: flex;
@@ -736,7 +744,7 @@ body {
 
 .tip-banner {
     background: var(--accent-soft);
-    border: 1px solid #dbeafe;
+    border: 1px solid var(--tint-border-blue);
     border-radius: 12px;
     padding: 18px 24px;
     display: flex;
@@ -765,10 +773,10 @@ body {
     flex-shrink: 0;
 }
 
-.icon-chip.blue { background: #eff6ff; color: var(--primary-blue); }
-.icon-chip.green { background: #f0fdf4; color: #16a34a; }
-.icon-chip.purple { background: #f5f3ff; color: #7c3aed; }
-.icon-chip.orange { background: #fff7ed; color: #ea580c; }
+.icon-chip.blue { background: var(--tint-blue); color: var(--primary-blue); }
+.icon-chip.green { background: var(--tint-green); color: #16a34a; }
+.icon-chip.purple { background: var(--tint-purple); color: #7c3aed; }
+.icon-chip.orange { background: var(--tint-orange); color: #ea580c; }
 
 .card-title-row {
     display: flex;
@@ -974,11 +982,11 @@ body {
     flex-shrink: 0;
 }
 
-.class-badge.c0 { background: #eff6ff; color: var(--primary-blue); }
-.class-badge.c1 { background: #f0fdf4; color: #16a34a; }
-.class-badge.c2 { background: #fff7ed; color: #ea580c; }
-.class-badge.c3 { background: #f5f3ff; color: #7c3aed; }
-.class-badge.c4 { background: #fef2f2; color: #dc2626; }
+.class-badge.c0 { background: var(--tint-blue); color: var(--primary-blue); }
+.class-badge.c1 { background: var(--tint-green); color: #16a34a; }
+.class-badge.c2 { background: var(--tint-orange); color: #ea580c; }
+.class-badge.c3 { background: var(--tint-purple); color: #7c3aed; }
+.class-badge.c4 { background: var(--tint-red); color: #dc2626; }
 
 .class-name-cell {
     display: flex;
@@ -1229,12 +1237,12 @@ body {
     font-size: 20px;
 }
 
-.stat-icon.blue { background: #eff6ff; color: var(--primary-blue); }
-.stat-icon.green { background: #f0fdf4; color: #16a34a; }
-.stat-icon.red { background: #fef2f2; color: #dc2626; }
-.stat-icon.amber { background: #fffbeb; color: #d97706; }
-.stat-icon.orange { background: #fff7ed; color: #ea580c; }
-.stat-icon.purple { background: #f5f3ff; color: #7c3aed; }
+.stat-icon.blue { background: var(--tint-blue); color: var(--primary-blue); }
+.stat-icon.green { background: var(--tint-green); color: #16a34a; }
+.stat-icon.red { background: var(--tint-red); color: #dc2626; }
+.stat-icon.amber { background: var(--tint-amber); color: #d97706; }
+.stat-icon.orange { background: var(--tint-orange); color: #ea580c; }
+.stat-icon.purple { background: var(--tint-purple); color: #7c3aed; }
 
 /* По-компактен вариант на stat-card, без декоративния десен елемент - за реда с 5 карти */
 .stats-grid-5 {
@@ -1776,7 +1784,7 @@ body {
     font-size: 13px;
     font-weight: 600;
     cursor: pointer;
-    background: #f1f5f9;
+    background: var(--surface-alt);
     color: var(--text-muted);
     transition: filter 0.15s ease;
 }
@@ -1785,11 +1793,11 @@ body {
     filter: brightness(0.96);
 }
 
-.class-chip.c0 { background: #eff6ff; color: var(--primary-blue); }
-.class-chip.c1 { background: #f0fdf4; color: #16a34a; }
-.class-chip.c2 { background: #fff7ed; color: #ea580c; }
-.class-chip.c3 { background: #f5f3ff; color: #7c3aed; }
-.class-chip.c4 { background: #fef2f2; color: #dc2626; }
+.class-chip.c0 { background: var(--tint-blue); color: var(--primary-blue); }
+.class-chip.c1 { background: var(--tint-green); color: #16a34a; }
+.class-chip.c2 { background: var(--tint-orange); color: #ea580c; }
+.class-chip.c3 { background: var(--tint-purple); color: #7c3aed; }
+.class-chip.c4 { background: var(--tint-red); color: #dc2626; }
 
 .class-chip.active {
     background: var(--primary-blue);
@@ -1868,13 +1876,13 @@ body {
 }
 
 .exercise-batch-card.entered {
-    border-color: #86efac;
-    background: #f0fdf4;
+    border-color: var(--tint-border-green);
+    background: var(--tint-green);
 }
 
 .exercise-batch-card.pending {
-    border-color: #fcd34d;
-    background: #fffbeb;
+    border-color: var(--tint-border-amber);
+    background: var(--tint-amber);
 }
 
 .exercise-batch-card.progress {
@@ -1882,8 +1890,8 @@ body {
 }
 
 .exercise-batch-card.review {
-    border-color: #93c5fd;
-    background: #eff6ff;
+    border-color: var(--tint-border-blue);
+    background: var(--tint-blue);
 }
 
 .batch-card-header {
@@ -2051,7 +2059,7 @@ body {
 }
 
 .btn-icon-danger:hover {
-    background: #fef2f2;
+    background: var(--tint-red);
 }
 
 @media (max-width: 720px) {
@@ -2071,7 +2079,7 @@ body {
     width: 100px;
     height: 6px;
     border-radius: 999px;
-    background: #e2e8f0;
+    background: var(--border-color);
     display: inline-block;
     vertical-align: middle;
     margin-right: 8px;
@@ -2439,7 +2447,7 @@ body.student-body {
 }
 
 .drop-zone {
-    border: 2px dashed #cbd5e1;
+    border: 2px dashed var(--border-color);
     border-radius: 12px;
     padding: 24px;
     text-align: center;

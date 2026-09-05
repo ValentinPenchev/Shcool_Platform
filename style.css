@@ -188,6 +188,18 @@ body {
     background: var(--accent-soft);
     color: var(--primary-blue);
     font-weight: 600;
+    box-shadow: inset 3px 0 0 var(--primary-blue);
+}
+
+/* Групови заглавия в страничната лента (Преподаване / Администриране) */
+.sidebar-group-label {
+    display: block;
+    font-size: 11px;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+    color: var(--text-muted);
+    padding: 14px 14px 6px;
 }
 
 /* Разгъващо меню "Класове" в страничната лента */
@@ -1002,6 +1014,10 @@ body {
 .empty-state p {
     font-size: 12px;
     color: var(--text-muted);
+}
+
+.empty-state .btn-primary {
+    margin-top: 16px;
 }
 
 .subtitle {
@@ -1865,8 +1881,189 @@ body {
     background: var(--surface-alt);
 }
 
+.exercise-batch-card.review {
+    border-color: #93c5fd;
+    background: #eff6ff;
+}
+
 .batch-card-header {
     margin-bottom: 6px;
+}
+
+/* Качвания, чакащи преглед от учителя, преди да се броят към оценката */
+.exercise-review-list {
+    list-style: none;
+    padding: 0;
+}
+
+.exercise-review-item {
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+    padding: 10px 0;
+    border-bottom: 1px solid var(--border-color);
+}
+
+.exercise-review-item:last-child {
+    border-bottom: none;
+}
+
+.exercise-review-item-main {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    flex-wrap: wrap;
+}
+
+.exercise-review-note {
+    font-size: 12px;
+    color: var(--text-muted);
+    font-style: italic;
+}
+
+.exercise-review-actions {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    flex-wrap: wrap;
+}
+
+.btn-sm {
+    padding: 5px 10px;
+    font-size: 12px;
+}
+
+/* Markdown редактор за описанието на задача - текст ляво, преглед дясно */
+.markdown-editor {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 12px;
+}
+
+.markdown-textarea {
+    font-family: 'Courier New', monospace;
+    font-size: 13px;
+    resize: vertical;
+}
+
+.markdown-preview {
+    border: 1px solid var(--border-color);
+    border-radius: 8px;
+    padding: 10px 12px;
+    background: var(--surface-alt);
+    font-size: 13px;
+    overflow-y: auto;
+    max-height: 200px;
+}
+
+.markdown-preview p:not(:last-child),
+.markdown-preview ul,
+.markdown-preview ol {
+    margin-bottom: 8px;
+}
+
+.markdown-preview code {
+    background: var(--card-bg);
+    padding: 1px 5px;
+    border-radius: 4px;
+    font-size: 12px;
+}
+
+.markdown-preview pre {
+    background: var(--card-bg);
+    padding: 8px;
+    border-radius: 6px;
+    overflow-x: auto;
+    margin-bottom: 8px;
+}
+
+/* На страницата на ученика описанието трябва да се чете изцяло, не в кутийка за преглед */
+.markdown-preview.assignment-description {
+    max-height: none;
+    background: var(--surface-alt);
+    text-align: left;
+}
+
+/* Бързи бележки (дневник на учителя) - в работния панел на клас */
+.student-notes-list {
+    padding: 0 20px 20px;
+}
+
+.student-notes-scroll {
+    max-height: 320px;
+    overflow-y: auto;
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+}
+
+.student-note-item {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
+    padding: 10px 14px;
+    background: var(--surface-alt);
+    border-radius: 10px;
+    border: 1px solid var(--border-color);
+}
+
+.student-note-main {
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+    min-width: 0;
+}
+
+.student-note-main strong {
+    font-size: 13px;
+    color: var(--text-dark);
+}
+
+.student-note-main span {
+    font-size: 13px;
+    color: var(--text-muted);
+    word-break: break-word;
+}
+
+.student-note-meta {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    flex-shrink: 0;
+}
+
+.student-note-date {
+    font-size: 11px;
+    color: var(--text-muted);
+    white-space: nowrap;
+}
+
+.btn-icon-danger {
+    background: none;
+    border: none;
+    color: #dc2626;
+    cursor: pointer;
+    font-size: 13px;
+    padding: 4px;
+    border-radius: 6px;
+    transition: background 0.15s;
+}
+
+.btn-icon-danger:hover {
+    background: #fef2f2;
+}
+
+@media (max-width: 720px) {
+    .student-note-item {
+        flex-direction: column;
+        align-items: flex-start;
+    }
+
+    .student-note-meta {
+        width: 100%;
+        justify-content: space-between;
+    }
 }
 
 /* Прогрес лента за упражненията (напр. 3/5 качвания) */
@@ -2714,6 +2911,29 @@ body.student-body {
     border-top: 1px solid var(--border-color);
 }
 
+/* Бързо редактиране на точки direct в реда на таблицата с резултати */
+.score-display {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+}
+
+.score-edit {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+}
+
+.inline-edit-input {
+    width: 60px;
+    padding: 5px 6px;
+    border: 1px solid var(--border-color);
+    border-radius: 6px;
+    background: var(--card-bg);
+    color: var(--text-dark);
+    font-size: 13px;
+}
+
 /* -----------------------------------------------------------------------------
    МОБИЛНА ВЕРСИЯ
    ----------------------------------------------------------------------------- */
@@ -2779,6 +2999,64 @@ body.student-body {
 }
 
 @media (max-width: 720px) {
+    /* Таблиците стават списък от карти на телефон - всеки ред е своя картичка,
+       клетките се подреждат вертикално с етикет отляво (data-label), вместо да
+       се налага хоризонтално превъртане на цяла таблица с 8-10 колони */
+    .table-responsive .styled-table thead {
+        display: none;
+    }
+
+    .table-responsive .styled-table,
+    .table-responsive .styled-table tbody {
+        display: block;
+        width: 100%;
+    }
+
+    .table-responsive .styled-table tr {
+        display: block;
+        border: 1px solid var(--border-color);
+        border-radius: 12px;
+        margin-bottom: 12px;
+        padding: 6px 0;
+        background: var(--card-bg);
+    }
+
+    .table-responsive .styled-table tr.submission-detail-row,
+    .table-responsive .styled-table tr.empty-state-row {
+        border: none;
+        padding: 0;
+        margin-bottom: 0;
+    }
+
+    .table-responsive .styled-table td {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 12px;
+        padding: 8px 14px;
+        border-bottom: none;
+        text-align: right;
+    }
+
+    .table-responsive .styled-table td[data-label]:not([data-label=""])::before {
+        content: attr(data-label);
+        font-weight: 600;
+        font-size: 12px;
+        color: var(--text-muted);
+        text-align: left;
+        margin-right: auto;
+    }
+
+    .table-responsive .styled-table td[data-label=""] {
+        justify-content: flex-start;
+        padding-bottom: 0;
+    }
+
+    .table-responsive .styled-table td:has(> .empty-state) {
+        display: block;
+        text-align: left;
+    }
+
     .app-header {
         padding: 14px 16px;
         flex-wrap: wrap;

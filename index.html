@@ -9,6 +9,7 @@
     <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap">
     <link rel="stylesheet" href="style.css">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/marked/12.0.2/marked.min.js"></script>
 </head>
 <body class="student-body">
 
@@ -50,6 +51,8 @@
             </div>
 
             <div id="page-alert" class="page-alert" style="display:none;"></div>
+
+            <div id="assignment-description-box" class="markdown-preview assignment-description" style="display:none; margin-bottom:16px;"></div>
 
             <div id="reference-materials-card" class="info-banner" style="display:none; margin-bottom:16px;">
                 <div class="info-left">
@@ -101,6 +104,16 @@
                             <input type="file" id="file-input" accept=".docx, .xlsx, .pptx" hidden>
                             <div id="file-name-display" class="selected-file-name"></div>
                         </div>
+                    </div>
+                </div>
+
+                <div class="form-field" id="exercise-note-field" style="display:none;">
+                    <div class="field-icon-box">
+                        <i class="fa-regular fa-comment"></i>
+                    </div>
+                    <div class="field-content">
+                        <label for="exercise-note">Бележка (незадължително)</label>
+                        <textarea id="exercise-note" class="custom-textarea" rows="2" placeholder="напр. Какво сте пробвали различно, или защо файлът прилича на предишен"></textarea>
                     </div>
                 </div>
 

@@ -224,7 +224,8 @@ async def create_assignment(
     deadline: Optional[str] = Form(None),
     reference_link: Optional[str] = Form(None),
     reference_file: Optional[UploadFile] = File(None),
-    assignment_id: Optional[str] = Form(None)
+    assignment_id: Optional[str] = Form(None),
+    description: Optional[str] = Form(None)
 ):
     """
     Създава нова задача, а ако е подаден assignment_id на съществуваща - я обновява
@@ -283,6 +284,11 @@ async def create_assignment(
     if not reference_link_value and existing_assignment:
         reference_link_value = existing_assignment.get("reference_link")
 
+    description_value = description if description is not None and description.strip() else None
+    if description_value is None and existing_assignment:
+        # Редакция без промяна на полето за описание - пази старото съдържание
+        description_value = existing_assignment.get("description")
+
     data = {
         "id": final_id,
         "title": title,
@@ -290,7 +296,8 @@ async def create_assignment(
         "criteria_json": criteria_parsed,
         "deadline": deadline or None,
         "reference_link": reference_link_value,
-        "reference_file_url": reference_file_url
+        "reference_file_url": reference_file_url,
+        "description": description_value
     }
 
     try:
@@ -367,7 +374,8 @@ async def get_assignment(assignment_id: str):
         "criteria": assignment.get("criteria_json", {}),
         "deadline": assignment.get("deadline"),
         "reference_file_url": assignment.get("reference_file_url"),
-        "reference_link": assignment.get("reference_link")
+        "reference_link": assignment.get("reference_link"),
+        "description": assignment.get("description")
     }
 
 # -----------------------------------------------------------------------------
@@ -674,6 +682,38 @@ async def delete_submission(submission_id: int):
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Грешка при изтриване: {str(e)}")
 
+@app.post("/api/admin/submissions/{submission_id}/grade")
+async def update_submission_grade(
+    submission_id: int,
+    score: float = Form(...),
+    max_score: float = Form(...)
+):
+    """Ръчна корекция на точките на едно предаване направо от таблицата (inline)."""
+    if max_score <= 0:
+        raise HTTPException(status_code=400, detail="Максималният брой точки трябва да е по-голям от 0.")
+    if score < 0 or score > max_score:
+        raise HTTPException(status_code=400, detail="Точките трябва да са между 0 и максималния брой точки.")
+
+    percentage = round((score / max_score * 100), 1)
+    grade_info = _percentage_to_grade(percentage)
+
+    try:
+        supabase.table("submissions").update({
+            "score": score,
+            "max_score": max_score,
+            "percentage": percentage
+        }).eq("id", submission_id).execute()
+        return {
+            "status": "success",
+            "score": score,
+            "max_score": max_score,
+            "percentage": percentage,
+            "grade": grade_info["grade"],
+            "grade_label": grade_info["grade_label"]
+        }
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Грешка при обновяване на оценката: {str(e)}")
+
 # -----------------------------------------------------------------------------
 # 3. УПРАЖНЕНИЯ (свободни качвания за практика, без автоматична проверка)
 # -----------------------------------------------------------------------------
@@ -702,10 +742,24 @@ async def upload_exercise(
     request: Request,
     class_id: str = Form(...),
     student_name: str = Form(...),
-    file: UploadFile = File(...)
+    file: UploadFile = File(...),
+    note: Optional[str] = Form(None)
 ):
     _check_rate_limit(request)
     contents = await file.read()
+    file_hash = hashlib.md5(contents).hexdigest()
+    note = note.strip() if note else None
+
+    # Изисква различно съдържание от предишно качване на същия ученик, освен ако
+    # не е добавена бележка - предпазва от спам с едно и също/празно копие
+    existing_res = supabase.table("exercise_uploads").select("file_hash") \
+        .eq("class_id", class_id).eq("student_name", student_name).eq("file_hash", file_hash).execute()
+    if existing_res.data and not note:
+        raise HTTPException(
+            status_code=400,
+            detail="Вече сте качили файл с точно същото съдържание. Качете различна работа или добавете бележка, обясняваща защо е същият файл."
+        )
+
     storage_path = (
         f"exercises/{sanitize_storage_segment(class_id)}/"
         f"{sanitize_storage_segment(student_name)}_{uuid.uuid4().hex[:6]}_{sanitize_storage_segment(file.filename)}"
@@ -723,21 +777,35 @@ async def upload_exercise(
             "filename": file.filename,
             "storage_path": storage_path,
             "file_url": file_url,
+            "file_hash": file_hash,
+            "note": note,
+            "status": "pending"
         }).execute()
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Грешка при запис на качването: {str(e)}")
 
-    count_res = supabase.table("exercise_uploads").select("id") \
-        .eq("class_id", class_id).eq("student_name", student_name).execute()
-    count = len(count_res.data or [])
+    accepted_res = supabase.table("exercise_uploads").select("id") \
+        .eq("class_id", class_id).eq("student_name", student_name).eq("status", "accepted").execute()
+    count = len(accepted_res.data or [])
 
     return {
         "status": "success",
         "filename": file.filename,
         "count": count,
         "remaining": max(0, EXCELLENT_UPLOAD_THRESHOLD - count),
-        "excellent": count >= EXCELLENT_UPLOAD_THRESHOLD
+        "excellent": count >= EXCELLENT_UPLOAD_THRESHOLD,
+        "pending_review": True
     }
+
+@app.post("/api/admin/exercises/{upload_id}/review")
+async def review_exercise_upload(upload_id: int, status: str = Form(...)):
+    if status not in ("accepted", "needs_rework", "pending"):
+        raise HTTPException(status_code=400, detail="Невалиден статус.")
+    try:
+        supabase.table("exercise_uploads").update({"status": status}).eq("id", upload_id).execute()
+        return {"status": "success"}
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Грешка при промяна на статуса: {str(e)}")
 
 @app.get("/api/admin/exercises")
 async def get_exercise_uploads(group_id: Optional[str] = None):
@@ -951,20 +1019,20 @@ async def mark_exercise_batch_graded(
     student_name: str = Form(...)
 ):
     """
-    Взима най-старите 5 (все още неотбелязани) качвания на ученика, трайно записва
-    оценката в exercise_grade_log (с имената на файловете за архив), след което
-    трие тези 5 качвания от exercise_uploads (файл + запис), за да не се трупат
-    безкрайно в базата и Storage.
+    Взима най-старите 5 ПРИЕТИ (status='accepted') качвания на ученика - чакащите
+    преглед или върнатите за преработка не се броят - трайно записва оценката в
+    exercise_grade_log (с имената на файловете за архив), след което трие тези 5
+    качвания от exercise_uploads (файл + запис), за да не се трупат безкрайно.
     """
     res = supabase.table("exercise_uploads").select("*") \
-        .eq("class_id", class_id).eq("student_name", student_name) \
+        .eq("class_id", class_id).eq("student_name", student_name).eq("status", "accepted") \
         .order("created_at", desc=False).execute()
     uploads = res.data or []
 
     if len(uploads) < EXCELLENT_UPLOAD_THRESHOLD:
         raise HTTPException(
             status_code=400,
-            detail=f"Няма достатъчно качвания за въвеждане на оценка ({len(uploads)}/{EXCELLENT_UPLOAD_THRESHOLD})."
+            detail=f"Няма достатъчно приети качвания за въвеждане на оценка ({len(uploads)}/{EXCELLENT_UPLOAD_THRESHOLD})."
         )
 
     batch = uploads[:EXCELLENT_UPLOAD_THRESHOLD]
@@ -1165,3 +1233,42 @@ async def reset_emotions(
         return {"status": "success"}
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Грешка при нулиране на емоциите: {str(e)}")
+
+# -----------------------------------------------------------------------------
+# 6. БЪРЗИ БЕЛЕЖКИ (дневник на учителя за отделни ученици)
+# -----------------------------------------------------------------------------
+
+@app.get("/api/admin/notes")
+async def get_student_notes(group_id: str):
+    try:
+        res = supabase.table("student_notes").select("*") \
+            .eq("class_id", group_id).order("created_at", desc=True).execute()
+        return res.data or []
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Грешка при четене на бележките: {str(e)}")
+
+@app.post("/api/admin/notes")
+async def add_student_note(
+    class_id: str = Form(...),
+    student_name: str = Form(...),
+    note: str = Form(...)
+):
+    if not note.strip():
+        raise HTTPException(status_code=400, detail="Бележката не може да е празна.")
+    try:
+        res = supabase.table("student_notes").insert({
+            "class_id": class_id,
+            "student_name": student_name,
+            "note": note.strip()
+        }).execute()
+        return {"status": "success", "data": res.data[0] if res.data else None}
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Грешка при запис на бележката: {str(e)}")
+
+@app.delete("/api/admin/notes/{note_id}")
+async def delete_student_note(note_id: int):
+    try:
+        supabase.table("student_notes").delete().eq("id", note_id).execute()
+        return {"status": "success", "message": f"Бележката {note_id} е изтрита."}
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Грешка при изтриване на бележката: {str(e)}")

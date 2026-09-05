@@ -9,6 +9,7 @@
     <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap">
     <link rel="stylesheet" href="style.css">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/marked/12.0.2/marked.min.js"></script>
 </head>
 <body>
 
@@ -36,6 +37,7 @@
                 <h2>VPClassroom</h2>
             </button>
 
+            <span class="sidebar-group-label">Преподаване</span>
             <ul class="sidebar-menu">
                 <li id="menu-home" class="active"><a href="#" onclick="goToOverview()"><i class="fa-solid fa-house"></i> Табло</a></li>
                 <li id="menu-classes-accordion" class="sidebar-accordion">
@@ -45,6 +47,10 @@
                     </a>
                     <ul class="sidebar-submenu" id="classes-accordion-list" hidden></ul>
                 </li>
+            </ul>
+
+            <span class="sidebar-group-label">Администриране</span>
+            <ul class="sidebar-menu">
                 <li id="menu-files"><a href="#" onclick="showSection('files')"><i class="fa-solid fa-folder-open"></i> Файлове</a></li>
             </ul>
 
@@ -354,6 +360,16 @@
                                 <input type="text" id="assign-title" class="custom-input" placeholder="напр. Упражнение 1 - MS Word" required>
                             </div>
                         </div>
+                        <div class="form-group">
+                            <label><i class="fa-brands fa-markdown label-icon"></i> Описание на задачата (Markdown, незадължително):</label>
+                            <div class="markdown-editor">
+                                <textarea id="assign-description" class="custom-textarea markdown-textarea" rows="6" placeholder="**Задание:** ...&#10;- Точка 1&#10;- Точка 2&#10;&#10;Може да ползвате `код`, списъци, **удебелен** текст и т.н." oninput="renderAssignmentDescriptionPreview()"></textarea>
+                                <div class="markdown-preview" id="assign-description-preview">
+                                    <span class="stat-sub">Тук ще се покаже прегледът...</span>
+                                </div>
+                            </div>
+                            <span class="field-hint">Ще се покаже форматирано на учениците на страницата за предаване.</span>
+                        </div>
                         <div class="form-grid">
                             <div class="form-group">
                                 <label><i class="fa-regular fa-calendar label-icon"></i> Краен срок (незадължително):</label>
@@ -616,6 +632,34 @@
                         <h3 style="margin:0;">Списък с ученици</h3>
                     </div>
                     <div id="workspace-roster-container"></div>
+                </div>
+
+                <div class="table-card" style="margin-top: 20px;">
+                    <div class="table-card-header">
+                        <div class="card-title-row">
+                            <div class="icon-chip orange"><i class="fa-regular fa-note-sticky"></i></div>
+                            <div>
+                                <h3>Бързи бележки</h3>
+                                <div class="card-subtitle">Дневник за отделни ученици - помага при оформяне на срочните оценки</div>
+                            </div>
+                        </div>
+                    </div>
+                    <form id="student-note-form" class="styled-form" style="padding: 0 20px 16px;">
+                        <div class="form-grid">
+                            <div class="form-group">
+                                <label>Ученик</label>
+                                <select id="note-student-select" class="custom-select" required></select>
+                            </div>
+                            <div class="form-group">
+                                <label>Бележка</label>
+                                <input type="text" id="note-text-input" class="custom-input" placeholder="напр. Забравен лаптоп, Активен в дискусията" required maxlength="300">
+                            </div>
+                        </div>
+                        <div class="form-actions">
+                            <button type="submit" class="btn-primary"><i class="fa-solid fa-plus"></i> Добави бележка</button>
+                        </div>
+                    </form>
+                    <div id="student-notes-list" class="student-notes-list"></div>
                 </div>
             </section>
 

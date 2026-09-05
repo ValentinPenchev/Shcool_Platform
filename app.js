@@ -101,12 +101,22 @@ async function loadAssignment() {
         }
 
         showReferenceMaterials(assignmentData);
+        showAssignmentDescription(assignmentData.description);
         populateStudentSelect(assignmentData.students);
     } catch (err) {
         console.error("Грешка при зареждане на задачата:", err);
         showAlert(err.message || "Грешка при зареждане на задачата.");
         document.getElementById("submission-form").style.display = "none";
     }
+}
+
+// Показва описанието на задачата (форматирано от Markdown), ако учителят е добавил такова
+function showAssignmentDescription(markdownSource) {
+    if (!markdownSource || !markdownSource.trim()) return;
+    const box = document.getElementById("assignment-description-box");
+    if (!box) return;
+    box.innerHTML = (typeof marked !== "undefined") ? marked.parse(markdownSource) : markdownSource;
+    box.style.display = "block";
 }
 
 function formatDeadline(dateStr) {
@@ -140,8 +150,9 @@ async function loadExerciseClass() {
         assignmentData = await res.json();
 
         document.getElementById("assignment-subtitle").textContent =
-            `Качване на упражнение · Клас: ${assignmentData.group_name || assignmentData.group_id} · 5 качвания = оценка Отличен`;
+            `Качване на упражнение · Клас: ${assignmentData.group_name || assignmentData.group_id} · 5 приети качвания = оценка Отличен`;
         document.getElementById("submit-btn").innerHTML = `<i class="fa-solid fa-paper-plane"></i> Качи упражнението`;
+        document.getElementById("exercise-note-field").style.display = "flex";
 
         populateStudentSelect(assignmentData.students);
     } catch (err) {
@@ -334,6 +345,10 @@ function setupSubmissionForm() {
             formData.append("criteria_json", JSON.stringify(assignmentData.criteria || {}));
             formData.append("assignment_id", assignmentId);
         }
+        if (pageMode === 'exercise') {
+            const note = document.getElementById("exercise-note")?.value.trim();
+            if (note) formData.append("note", note);
+        }
 
         try {
             const res = await fetch(`${API_URL}${endpoint}`, {
@@ -425,9 +440,7 @@ function showExerciseResult(result) {
     document.getElementById("submission-form").style.display = "none";
     document.getElementById("page-alert").style.display = "none";
 
-    document.getElementById("result-title").textContent = result.excellent
-        ? "Упражнението е качено! Достигнахте 5 качвания."
-        : "Упражнението е качено успешно!";
+    document.getElementById("result-title").textContent = "Файлът е получен и очаква преглед от учителя!";
     document.getElementById("result-filename").textContent = result.filename || "";
     document.getElementById("result-score-row").style.display = "none";
 
@@ -442,8 +455,8 @@ function showExerciseResult(result) {
 
     const progressEl = document.getElementById("result-exercise-progress");
     progressEl.textContent = result.excellent
-        ? `Качени упражнения: ${result.count} / 5`
-        : `Качени упражнения: ${result.count} / 5 · Още ${result.remaining} до оценка Отличен`;
+        ? `Приети упражнения досега: ${result.count} / 5 - учителят преглежда новото качване`
+        : `Приети упражнения досега: ${result.count} / 5 · Учителят трябва да прегледа новото качване, преди да се преброи`;
     progressEl.style.display = "block";
 
     document.getElementById("result-panel").style.display = "block";

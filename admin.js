@@ -357,6 +357,7 @@ function showSection(sectionId) {
     if (sectionId === 'assignments') {
         if (lockedClassId) {
             document.getElementById("filter-assignments-class").value = lockedClassId;
+            document.getElementById("assign-group-select").value = lockedClassId;
             loadAssignments(lockedClassId);
         }
     }
@@ -800,8 +801,9 @@ function renderClassesTable(entries) {
             <tr><td colspan="6">
                 <div class="empty-state">
                     <div class="empty-icon"><i class="fa-solid fa-inbox"></i></div>
-                    <h4>Няма намерени класове</h4>
-                    <p>Създайте първия клас, за да го видите тук.</p>
+                    <h4>Все още нямате създадени класове</h4>
+                    <p>Добавете първия си клас, за да започнете да управлявате ученици.</p>
+                    <button type="button" class="btn-primary" onclick="focusCreateClassForm()"><i class="fa-solid fa-plus"></i> Създай първи клас</button>
                 </div>
             </td></tr>
         `;
@@ -829,22 +831,22 @@ function renderClassRow(classId, data, colorIndex = 0) {
 
     return `
         <tr id="class-row-${classId}" class="clickable-row" onclick="viewClassResults('${classId}')" title="Отвори резултатите за този клас">
-            <td><button type="button" class="btn-icon expand-toggle" id="toggle-${rowId}" onclick="event.stopPropagation(); toggleClassRoster('${classId}')" title="Управление на ученици"><i class="fa-solid fa-chevron-right"></i></button></td>
-            <td>
+            <td data-label=""><button type="button" class="btn-icon expand-toggle" id="toggle-${rowId}" onclick="event.stopPropagation(); toggleClassRoster('${classId}')" title="Управление на ученици"><i class="fa-solid fa-chevron-right"></i></button></td>
+            <td data-label="Клас">
                 <div class="class-name-cell">
                     <span class="class-badge ${classBadgeColorIndex(colorIndex)}">${(className || classId).slice(0, 2)}</span>
                     <strong>${className}</strong>
                 </div>
             </td>
-            <td>${classId}</td>
-            <td><i class="fa-solid fa-user-group" style="color: var(--text-muted); margin-right: 6px;"></i>${students.length} ученици</td>
-            <td>
+            <td data-label="ID">${classId}</td>
+            <td data-label="Ученици"><i class="fa-solid fa-user-group" style="color: var(--text-muted); margin-right: 6px;"></i>${students.length} ученици</td>
+            <td data-label="Линк за упражнения">
                 <div class="file-name-cell">
                     <a href="${exerciseUrl}" target="_blank" rel="noopener" class="task-link" onclick="event.stopPropagation();">${exerciseUrl}</a>
                     <button type="button" class="btn-icon" onclick="event.stopPropagation(); copyExerciseLink('${classId}')" title="Копирай линка за упражнения"><i class="fa-regular fa-copy"></i></button>
                 </div>
             </td>
-            <td>
+            <td data-label="Действия">
                 <button type="button" class="btn-icon" onclick="event.stopPropagation(); editClass('${classId}')" title="Редактирай класа"><i class="fa-regular fa-pen-to-square"></i></button>
                 <button type="button" class="btn-danger-icon" onclick="event.stopPropagation(); deleteClass('${classId}')" title="Изтрий класа"><i class="fa-regular fa-trash-can"></i></button>
             </td>
@@ -859,6 +861,20 @@ function renderClassRow(classId, data, colorIndex = 0) {
 function viewClassResults(classId) {
     syncClassFilter(classId);
     showSection('dashboard');
+}
+
+// Извиква фокус върху формата за нов клас/задача - използва се от бутоните
+// в "празните състояния" на таблиците (Все още нямате X -> [Създай първи X])
+function focusCreateClassForm() {
+    showSection('classes');
+    document.getElementById("class-id")?.scrollIntoView({ behavior: "smooth", block: "center" });
+    document.getElementById("class-id")?.focus();
+}
+
+function focusCreateAssignmentForm() {
+    showSection('assignments');
+    document.getElementById("assign-title")?.scrollIntoView({ behavior: "smooth", block: "center" });
+    document.getElementById("assign-title")?.focus();
 }
 
 // Разгъва/свива панела за управление на учениците на даден клас
@@ -1148,6 +1164,8 @@ function editAssignment(assignmentId) {
     document.getElementById("assign-title").value = data.title || "";
     document.getElementById("assign-deadline").value = data.deadline ? isoToDatetimeLocalValue(data.deadline) : "";
     document.getElementById("assign-reference-link").value = data.reference_link || "";
+    document.getElementById("assign-description").value = data.description || "";
+    renderAssignmentDescriptionPreview();
 
     document.getElementById("assignment-form-title").textContent = `Редактиране на задача: ${data.title}`;
     document.getElementById("assignment-form-submit-btn").innerHTML = '<i class="fa-solid fa-check"></i> Запази промените';
@@ -1163,6 +1181,19 @@ function cancelAssignmentEdit() {
     document.getElementById("assignment-form-title").textContent = "Създай Задача";
     document.getElementById("assignment-form-submit-btn").innerHTML = '<i class="fa-solid fa-plus"></i> Създай Задача';
     document.getElementById("assignment-form-cancel-btn").style.display = "none";
+    renderAssignmentDescriptionPreview();
+}
+
+// Живо превключва Markdown -> HTML в панела за описание на задача
+function renderAssignmentDescriptionPreview() {
+    const source = document.getElementById("assign-description")?.value || "";
+    const preview = document.getElementById("assign-description-preview");
+    if (!preview) return;
+    if (!source.trim()) {
+        preview.innerHTML = `<span class="stat-sub">Тук ще се покаже прегледът...</span>`;
+        return;
+    }
+    preview.innerHTML = (typeof marked !== "undefined") ? marked.parse(source) : source;
 }
 
 // Изтриване на клас
@@ -1207,6 +1238,112 @@ function loadWorkspaceStudents() {
     document.getElementById("workspace-class-id-display").value = lockedClassId;
     document.getElementById("workspace-class-name-input").value = data.className;
     document.getElementById("workspace-roster-container").innerHTML = buildClassRosterHtml(lockedClassId, "workspace");
+    populateNoteStudentSelect(data);
+    loadStudentNotes();
+}
+
+function escapeHtml(str) {
+    return String(str ?? "").replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
+}
+
+// Попълва падащото меню за избор на ученик в картата "Бързи бележки"
+function populateNoteStudentSelect(data) {
+    const select = document.getElementById("note-student-select");
+    if (!select) return;
+    const students = data.students || [];
+    select.innerHTML = '<option value="" disabled selected>-- Изберете ученик --</option>' +
+        students.map(name => `<option value="${escapeHtml(name)}">${escapeHtml(name)}</option>`).join("");
+}
+
+let studentNotesCache = [];
+
+// Зарежда бързите бележки за текущия клас в работния панел
+async function loadStudentNotes() {
+    if (!lockedClassId) return;
+    const container = document.getElementById("student-notes-list");
+    if (!container) return;
+    try {
+        const res = await adminFetch(`${API_URL}/admin/notes?group_id=${encodeURIComponent(lockedClassId)}`);
+        studentNotesCache = res.ok ? await res.json() : [];
+    } catch (err) {
+        studentNotesCache = [];
+    }
+    renderStudentNotes();
+}
+
+function renderStudentNotes() {
+    const container = document.getElementById("student-notes-list");
+    if (!container) return;
+    if (!studentNotesCache.length) {
+        container.innerHTML = `<div class="empty-state" style="padding: 24px 20px;">
+            <i class="fa-regular fa-note-sticky" style="font-size:28px; color: var(--text-muted); margin-bottom: 8px;"></i>
+            <p>Все още няма добавени бележки за този клас.</p>
+        </div>`;
+        return;
+    }
+    const sorted = [...studentNotesCache].sort((a, b) => new Date(b.created_at) - new Date(a.created_at));
+    container.innerHTML = `<div class="student-notes-scroll">` + sorted.map(note => `
+        <div class="student-note-item">
+            <div class="student-note-main">
+                <strong>${escapeHtml(note.student_name)}</strong>
+                <span>${escapeHtml(note.note)}</span>
+            </div>
+            <div class="student-note-meta">
+                <span class="student-note-date">${formatNoteDate(note.created_at)}</span>
+                <button type="button" class="btn-icon-danger" onclick="deleteStudentNote(${note.id})" title="Изтрий">
+                    <i class="fa-solid fa-trash"></i>
+                </button>
+            </div>
+        </div>
+    `).join("") + `</div>`;
+}
+
+function formatNoteDate(iso) {
+    try {
+        const d = new Date(iso);
+        return d.toLocaleDateString("bg-BG", { day: "2-digit", month: "2-digit", year: "numeric" }) + " " +
+            d.toLocaleTimeString("bg-BG", { hour: "2-digit", minute: "2-digit" });
+    } catch {
+        return "";
+    }
+}
+
+document.getElementById("student-note-form")?.addEventListener("submit", async (e) => {
+    e.preventDefault();
+    if (!lockedClassId) return;
+    const studentName = document.getElementById("note-student-select").value;
+    const noteText = document.getElementById("note-text-input").value.trim();
+    if (!studentName || !noteText) return;
+
+    const formData = new FormData();
+    formData.append("class_id", lockedClassId);
+    formData.append("student_name", studentName);
+    formData.append("note", noteText);
+
+    try {
+        const res = await adminFetch(`${API_URL}/admin/notes`, { method: "POST", body: formData });
+        if (!res.ok) {
+            const errData = await res.json().catch(() => ({}));
+            throw new Error(errData.detail || `HTTP грешка: ${res.status}`);
+        }
+        document.getElementById("note-text-input").value = "";
+        await loadStudentNotes();
+        showToast("Бележката е добавена.", "success");
+    } catch (err) {
+        showToast("Грешка: " + err.message, "error");
+    }
+});
+
+async function deleteStudentNote(noteId) {
+    if (!confirm("Да изтрия ли тази бележка?")) return;
+    try {
+        const res = await adminFetch(`${API_URL}/admin/notes/${noteId}`, { method: "DELETE" });
+        if (!res.ok) throw new Error(`HTTP грешка: ${res.status}`);
+        await loadStudentNotes();
+        showToast("Бележката е изтрита.", "success");
+    } catch (err) {
+        showToast("Грешка: " + err.message, "error");
+    }
 }
 
 document.getElementById("workspace-class-info-form")?.addEventListener("submit", async (e) => {
@@ -1456,8 +1593,9 @@ function renderAssignmentsTable(list) {
             <tr><td colspan="6">
                 <div class="empty-state">
                     <div class="empty-icon"><i class="fa-solid fa-inbox"></i></div>
-                    <h4>Няма създадени задачи</h4>
+                    <h4>Все още нямате създадени задачи${lockedClassId ? ' за този клас' : ''}</h4>
                     <p>Създайте първата задача, за да я видите тук.</p>
+                    <button type="button" class="btn-primary" onclick="focusCreateAssignmentForm()"><i class="fa-solid fa-plus"></i> Създай първа задача</button>
                 </div>
             </td></tr>
         `;
@@ -1696,12 +1834,12 @@ function renderAssignmentRow(a) {
 
     return `
         <tr id="assignment-row-${a.id}">
-            <td><strong>${a.title}</strong></td>
-            <td>${a.group_id || a.class_id || ''}</td>
-            <td>${deadlineText}</td>
-            <td>${materialsIcons}</td>
-            <td><a href="${studentUrl}" target="_blank" class="task-link">${studentUrl}</a></td>
-            <td>
+            <td data-label="Заглавие"><strong>${a.title}</strong></td>
+            <td data-label="Клас">${a.group_id || a.class_id || ''}</td>
+            <td data-label="Краен срок">${deadlineText}</td>
+            <td data-label="Материали">${materialsIcons}</td>
+            <td data-label="Линк"><a href="${studentUrl}" target="_blank" class="task-link">${studentUrl}</a></td>
+            <td data-label="Действия">
                 <button type="button" class="btn-icon" onclick="copyAssignmentLink('${a.id}')" title="Копирай линка"><i class="fa-regular fa-copy"></i></button>
                 <button type="button" class="btn-icon" onclick="editAssignment('${a.id}')" title="Редактирай задачата"><i class="fa-regular fa-pen-to-square"></i></button>
                 <button type="button" class="btn-danger-icon" onclick="deleteAssignment('${a.id}')" title="Изтрий задачата"><i class="fa-regular fa-trash-can"></i></button>
@@ -1816,6 +1954,7 @@ document.getElementById("create-assignment-form")?.addEventListener("submit", as
     const referenceFileInput = document.getElementById("assign-reference-file");
     const saveAsTemplate = document.getElementById("assign-save-as-template").checked;
     const templateTitle = document.getElementById("assign-template-title").value.trim();
+    const description = document.getElementById("assign-description").value;
 
     const formData = new FormData();
     formData.append("group_id", group_id);
@@ -1833,6 +1972,7 @@ document.getElementById("create-assignment-form")?.addEventListener("submit", as
     if (referenceLink) formData.append("reference_link", referenceLink);
     if (referenceFileInput.files.length > 0) formData.append("reference_file", referenceFileInput.files[0]);
     if (editingAssignmentId) formData.append("assignment_id", editingAssignmentId);
+    if (description.trim()) formData.append("description", description);
 
     try {
         const response = await adminFetch(`${API_URL}/admin/assignments`, {
@@ -1880,6 +2020,7 @@ document.getElementById("create-assignment-form")?.addEventListener("submit", as
         } else {
             document.getElementById("create-assignment-form").reset();
             document.getElementById("assign-template-title").style.display = "none";
+            renderAssignmentDescriptionPreview();
         }
 
         const currentFilter = document.getElementById("filter-assignments-class").value;
@@ -2079,16 +2220,28 @@ function renderSubmissionsTable() {
 
         return `
             <tr class="clickable-row" onclick="toggleSubmissionDetails(${sub.id})">
-                <td><button type="button" class="btn-icon expand-toggle" id="toggle-${sub.id}" title="Детайли по критерии"><i class="fa-solid fa-chevron-right"></i></button></td>
-                <td>${index + 1}</td>
-                <td><span class="row-avatar a${index % 5}">${studentName.slice(0, 1).toUpperCase()}</span><strong>${studentName}</strong></td>
-                <td>${taskTitle}</td>
-                <td><div class="file-name-cell"><i class="fa-regular fa-file-lines"></i>${sub.filename || sub.file_name || 'Файл'}</div></td>
-                <td>${submittedAt}</td>
-                <td><strong>${sub.score || 0}</strong> / ${sub.max_score || 100} точки</td>
-                <td>${gradeCell}</td>
-                <td><span class="badge-status">${statusBadge}</span>${lateBadge}</td>
-                <td onclick="event.stopPropagation();">${fileActions}<button type="button" class="btn-danger-icon" onclick="deleteSubmission(${sub.id})" title="Изтрий предаването"><i class="fa-regular fa-trash-can"></i></button></td>
+                <td data-label=""><button type="button" class="btn-icon expand-toggle" id="toggle-${sub.id}" title="Детайли по критерии"><i class="fa-solid fa-chevron-right"></i></button></td>
+                <td data-label="№">${index + 1}</td>
+                <td data-label="Ученик"><span class="row-avatar a${index % 5}">${studentName.slice(0, 1).toUpperCase()}</span><strong>${studentName}</strong></td>
+                <td data-label="Задача">${taskTitle}</td>
+                <td data-label="Файл"><div class="file-name-cell"><i class="fa-regular fa-file-lines"></i>${sub.filename || sub.file_name || 'Файл'}</div></td>
+                <td data-label="Предадено на">${submittedAt}</td>
+                <td data-label="Точки / Успех" onclick="event.stopPropagation();">
+                    <span class="score-display" id="score-display-${sub.id}">
+                        <strong>${sub.score || 0}</strong> / ${sub.max_score || 100} точки
+                        <button type="button" class="btn-icon" onclick="startEditScore(${sub.id})" title="Редактирай точките"><i class="fa-regular fa-pen-to-square"></i></button>
+                    </span>
+                    <span class="score-edit" id="score-edit-${sub.id}" style="display:none;">
+                        <input type="number" id="score-input-${sub.id}" value="${sub.score || 0}" min="0" step="0.5" class="inline-edit-input">
+                        <span>/</span>
+                        <input type="number" id="maxscore-input-${sub.id}" value="${sub.max_score || 100}" min="1" step="0.5" class="inline-edit-input">
+                        <button type="button" class="btn-icon" onclick="saveEditScore(${sub.id})" title="Запази"><i class="fa-solid fa-check"></i></button>
+                        <button type="button" class="btn-icon" onclick="cancelEditScore(${sub.id})" title="Отказ"><i class="fa-solid fa-xmark"></i></button>
+                    </span>
+                </td>
+                <td data-label="Оценка">${gradeCell}</td>
+                <td data-label="Статус"><span class="badge-status">${statusBadge}</span>${lateBadge}</td>
+                <td data-label="Материал" onclick="event.stopPropagation();">${fileActions}<button type="button" class="btn-danger-icon" onclick="deleteSubmission(${sub.id})" title="Изтрий предаването"><i class="fa-regular fa-trash-can"></i></button></td>
             </tr>
             <tr class="submission-detail-row" id="${detailRowId}" hidden>
                 <td colspan="10">${buildSubmissionDetailsHtml(sub)}</td>
@@ -2097,6 +2250,52 @@ function renderSubmissionsTable() {
     }).join("");
 
     renderSubmissionsPagination(filtered.length);
+}
+
+// Бързо редактиране на точките на предаване направо в реда, без модален прозорец
+function startEditScore(id) {
+    document.getElementById(`score-display-${id}`).style.display = "none";
+    document.getElementById(`score-edit-${id}`).style.display = "inline-flex";
+    document.getElementById(`score-input-${id}`).focus();
+}
+
+function cancelEditScore(id) {
+    document.getElementById(`score-display-${id}`).style.display = "inline-flex";
+    document.getElementById(`score-edit-${id}`).style.display = "none";
+}
+
+async function saveEditScore(id) {
+    const score = parseFloat(document.getElementById(`score-input-${id}`).value);
+    const maxScore = parseFloat(document.getElementById(`maxscore-input-${id}`).value);
+    if (isNaN(score) || isNaN(maxScore)) {
+        showToast("Невалидни стойности за точки.", "warning");
+        return;
+    }
+
+    const formData = new FormData();
+    formData.append("score", score);
+    formData.append("max_score", maxScore);
+
+    try {
+        const res = await adminFetch(`${API_URL}/admin/submissions/${id}/grade`, { method: "POST", body: formData });
+        if (!res.ok) {
+            const errData = await res.json().catch(() => ({}));
+            throw new Error(errData.detail || `HTTP грешка: ${res.status}`);
+        }
+        const result = await res.json();
+        const sub = submissionsCache.find(s => s.id === id);
+        if (sub) {
+            sub.score = result.score;
+            sub.max_score = result.max_score;
+            sub.percentage = result.percentage;
+            sub.grade = result.grade;
+            sub.grade_label = result.grade_label;
+        }
+        renderSubmissionsTable();
+        showToast("Оценката е обновена.", "success");
+    } catch (err) {
+        showToast("Грешка при запазване: " + err.message, "error");
+    }
 }
 
 // Изгражда съдържанието на разширения ред: какво е пропуснато от критериите
@@ -2465,13 +2664,16 @@ function renderExercisesTable(classId) {
     }
 
     tbody.innerHTML = names.map((name, index) => {
-        const uploads = (uploadsByStudent[name] || []).slice().sort((a, b) => new Date(a.created_at || 0) - new Date(b.created_at || 0));
+        const allUploads = (uploadsByStudent[name] || []).slice().sort((a, b) => new Date(a.created_at || 0) - new Date(b.created_at || 0));
+        const acceptedUploads = allUploads.filter(u => (u.status || 'accepted') === 'accepted');
+        const reviewUploads = allUploads.filter(u => u.status === 'pending' || u.status === 'needs_rework');
         const grades = (gradesByStudent[name] || []).slice().sort((a, b) => new Date(a.entered_at || 0) - new Date(b.entered_at || 0));
-        const batches = chunkIntoBatches(uploads, EXCELLENT_UPLOAD_THRESHOLD);
+        const batches = chunkIntoBatches(acceptedUploads, EXCELLENT_UPLOAD_THRESHOLD);
         const readyBatches = batches.filter(b => b.length === EXCELLENT_UPLOAD_THRESHOLD);
         const inProgressBatch = batches.find(b => b.length < EXCELLENT_UPLOAD_THRESHOLD);
         const inProgressCount = inProgressBatch ? inProgressBatch.length : 0;
         const hasReady = readyBatches.length > 0;
+        const pendingCount = allUploads.filter(u => u.status === 'pending').length;
         const rowId = `exercise-student-${index}`;
         const safeName = escapeJsString(name);
 
@@ -2479,12 +2681,16 @@ function renderExercisesTable(classId) {
             ? `<span class="badge-status grade-badge grade-high"><i class="fa-solid fa-circle-check"></i> ${grades.length} ${grades.length === 1 ? 'въведена' : 'въведени'}</span>`
             : '<span class="stat-sub">Няма</span>';
 
-        // Единна индикация за оценка: докато не е готова (< 5 качвания) е прогрес лента;
-        // щом стигне 5, самата индикация става кликаема (кехлибарена) - при клик трайно
-        // се записва и остава зелена ("въведена"), вместо отделен бутон до нея.
+        const reviewBadge = pendingCount > 0
+            ? `<span class="badge-status grade-badge grade-mid"><i class="fa-solid fa-hourglass-half"></i> ${pendingCount} ${pendingCount === 1 ? 'чака' : 'чакат'} преглед</span>`
+            : '';
+
+        // Единна индикация за оценка: докато не е готова (< 5 приети качвания) е прогрес
+        // лента; щом стигне 5 ПРИЕТИ, самата индикация става кликаема (кехлибарена) -
+        // при клик трайно се записва и остава зелена ("въведена").
         const gradeIndicatorCell = hasReady
             ? gradeIndicator(classId, safeName, 'pending')
-            : `<div class="progress-bar-track"><div class="progress-bar-fill" style="width:${Math.round((inProgressCount / EXCELLENT_UPLOAD_THRESHOLD) * 100)}%"></div></div><span class="stat-sub">${inProgressCount} / ${EXCELLENT_UPLOAD_THRESHOLD}</span>`;
+            : `<div class="progress-bar-track"><div class="progress-bar-fill" style="width:${Math.round((inProgressCount / EXCELLENT_UPLOAD_THRESHOLD) * 100)}%"></div></div><span class="stat-sub">${inProgressCount} / ${EXCELLENT_UPLOAD_THRESHOLD} приети</span>`;
 
         const historyHtml = grades.map(g => `
             <div class="exercise-batch-card entered">
@@ -2498,6 +2704,33 @@ function renderExercisesTable(classId) {
             </div>
         `).join('');
 
+        // Чакащи преглед / върнати за преработка - НЕ се броят към оценката, докато
+        // учителят не ги приеме изрично (предпазва от спам с празни/еднакви файлове)
+        const reviewHtml = reviewUploads.length === 0 ? '' : `
+            <div class="exercise-batch-card review">
+                <div class="batch-card-header">
+                    <span class="stat-sub">Чакат преглед - не се броят към оценката:</span>
+                </div>
+                <ul class="missed-criteria-list exercise-review-list">
+                    ${reviewUploads.map(u => `
+                        <li class="exercise-review-item">
+                            <div class="exercise-review-item-main">
+                                <i class="fa-regular fa-file-lines"></i> ${u.filename || 'Файл'} · ${formatSubmittedAt(u.created_at)}
+                                <span class="badge-status grade-badge ${u.status === 'needs_rework' ? 'grade-low' : 'grade-mid'}">${u.status === 'needs_rework' ? 'За преработка' : 'Изчаква преглед'}</span>
+                            </div>
+                            ${u.note ? `<div class="exercise-review-note"><i class="fa-regular fa-comment"></i> ${u.note}</div>` : ''}
+                            <div class="exercise-review-actions">
+                                ${u.file_url && u.file_url !== '#' ? `<button type="button" class="btn-icon" title="Прегледай" onclick="event.stopPropagation(); openFilePreview('${u.file_url}', ${JSON.stringify(u.filename || 'Файл').replace(/"/g, '&quot;')})"><i class="fa-regular fa-eye"></i></button>` : ''}
+                                <button type="button" class="btn-secondary btn-sm" onclick="event.stopPropagation(); reviewExerciseUpload(${u.id}, 'accepted', '${classId}')"><i class="fa-solid fa-check"></i> Прието за практика</button>
+                                <button type="button" class="btn-secondary btn-sm" onclick="event.stopPropagation(); reviewExerciseUpload(${u.id}, 'needs_rework', '${classId}')"><i class="fa-solid fa-rotate-left"></i> За преработка</button>
+                                <button type="button" class="btn-danger-icon" onclick="event.stopPropagation(); deleteExerciseUpload(${u.id}, '${classId}')" title="Изтрий качването"><i class="fa-regular fa-trash-can"></i></button>
+                            </div>
+                        </li>
+                    `).join('')}
+                </ul>
+            </div>
+        `;
+
         const currentBatchesHtml = batches.map(batch => {
             const isReady = batch.length === EXCELLENT_UPLOAD_THRESHOLD;
             return `
@@ -2505,7 +2738,7 @@ function renderExercisesTable(classId) {
                     <div class="batch-card-header">
                         ${isReady
                             ? gradeIndicator(classId, safeName, 'pending')
-                            : `<span class="stat-sub">В процес: ${batch.length} / ${EXCELLENT_UPLOAD_THRESHOLD}</span>`}
+                            : `<span class="stat-sub">Приети, в процес: ${batch.length} / ${EXCELLENT_UPLOAD_THRESHOLD}</span>`}
                     </div>
                     <ul class="missed-criteria-list">
                         ${batch.map(u => `
@@ -2520,20 +2753,37 @@ function renderExercisesTable(classId) {
             `;
         }).join('');
 
-        const detailContent = (historyHtml + currentBatchesHtml) || `<div class="submission-detail-empty">Няма качени упражнения все още.</div>`;
+        const detailContent = (reviewHtml + historyHtml + currentBatchesHtml) || `<div class="submission-detail-empty">Няма качени упражнения все още.</div>`;
 
         return `
             <tr class="clickable-row" onclick="toggleExerciseDetails('${rowId}')">
                 <td><button type="button" class="btn-icon expand-toggle" id="toggle-${rowId}" title="Детайли по качвания"><i class="fa-solid fa-chevron-right"></i></button></td>
                 <td><span class="row-avatar a${index % 5}">${name.slice(0, 1).toUpperCase()}</span><strong>${name}</strong></td>
                 <td>${gradedBadge}</td>
-                <td>${gradeIndicatorCell}</td>
+                <td>${gradeIndicatorCell} ${reviewBadge}</td>
             </tr>
             <tr class="submission-detail-row" id="detail-${rowId}" hidden>
                 <td colspan="4">${detailContent}</td>
             </tr>
         `;
     }).join("");
+}
+
+// Учителят приема/връща за преработка едно чакащо качване - само приетите се
+// броят към прага от 5 за оценка Отличен
+async function reviewExerciseUpload(uploadId, status, classId) {
+    const formData = new FormData();
+    formData.append("status", status);
+    try {
+        const res = await adminFetch(`${API_URL}/admin/exercises/${uploadId}/review`, { method: "POST", body: formData });
+        if (!res.ok) throw new Error("Грешка при заявката към сървъра");
+        const upload = exercisesCache.find(u => u.id === uploadId);
+        if (upload) upload.status = status;
+        renderExercisesTable(classId);
+        showToast(status === 'accepted' ? "Качването е прието за практика." : "Качването е върнато за преработка.", "success");
+    } catch (err) {
+        showToast("Грешка при преглед на качването: " + err.message, "error");
+    }
 }
 
 // Единна кликаема/статична индикация за оценка от упражнения. В "pending" състояние е
